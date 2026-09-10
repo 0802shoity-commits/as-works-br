@@ -30,6 +30,8 @@ type CustomerAction = {
   created_at: string;
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function CustomersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
