@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '../lib/supabase';
 import { getBusinessType } from '../lib/businessTypes';
@@ -32,7 +32,7 @@ type CustomerAction = {
 
 export const dynamic = 'force-dynamic';
 
-export default function CustomersPage() {
+function CustomersPage()  {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -906,4 +906,7 @@ export default function CustomersPage() {
       </div>
     </div>
   );
+}
+export default function Page() {
+  return <Suspense><CustomersPage /></Suspense>;
 }
