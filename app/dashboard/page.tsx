@@ -630,8 +630,8 @@ return (
       }
     `}</style>
     <div style={{ background: "white", padding: "8px 30px", borderBottom: "2px solid #e0e0e0", display: "flex", alignItems: "center", gap: "50px", zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0px", fontSize: "40px", color: "#000000", letterSpacing: "1px", fontFamily: "Arial, sans-serif", fontWeight: "bold", minWidth: "200px" }}>
-        <img src="/awwork.png" alt="As-Works logo" style={{ width: "100px", height: "100px", objectFit: "contain", mixBlendMode: "multiply", marginRight: "-10px" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: "0px", fontSize: "24px", color: "#000000", letterSpacing: "1px", fontFamily: "Arial, sans-serif", fontWeight: "bold", minWidth: "140px", whiteSpace: "nowrap" }}>
+  <img src="/awwork.png" alt="As-Works logo" style={{ width: "60px", height: "60px", objectFit: "contain", mixBlendMode: "multiply", marginRight: "-6px" }} />
         -Works
       </div>
       <div style={{ display: "flex", gap: "30px", alignItems: "center" }}>
