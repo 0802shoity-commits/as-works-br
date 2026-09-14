@@ -407,9 +407,7 @@ function CustomersPage()  {
           transition: 'all 0.2s ease',
         }}
       >
-        {/* 閉じた状態 — 名前・電話・住所・車種が見える */}
         <div onClick={() => setExpandedId(isExpanded ? null : customer.id)} style={{ padding: '16px 20px', cursor: 'pointer' }}>
-          {/* 1行目: 名前(大) + BL + アクション + 電話 ... 車種カード ... 編集・履歴 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
               <div style={{ fontSize: '20px', fontWeight: 'bold', color: isBlack ? '#dc2626' : '#1a1a2e', flexShrink: 0 }}>{customer.name}</div>
@@ -442,7 +440,6 @@ function CustomersPage()  {
               <span style={{ fontSize: '14px', color: '#c0c4d0', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </div>
           </div>
-          {/* 2行目: 左に住所、右に車検バッジ */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
               {customer.address && <span style={{ fontSize: '13px', color: '#6b7280' }}>{customer.address}</span>}
@@ -453,11 +450,9 @@ function CustomersPage()  {
           </div>
         </div>
 
-        {/* 展開した状態 */}
         {isExpanded && (
           <div style={{ borderTop: '1px solid #f0f0f0', padding: '20px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isCar && !customer.inspection_date ? '1fr' : (isCar ? 'auto 1fr' : '1fr 2fr'), gap: '20px', marginBottom: '16px' }}>
-              {/* 左: 基本情報（車ナンバーは閉じた状態で表示済み） */}
               {(isCar ? customer.inspection_date : true) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {isCar ? null : (
@@ -471,7 +466,6 @@ function CustomersPage()  {
               </div>
               )}
 
-              {/* 右: 作業履歴 */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>作業履歴</div>
@@ -816,14 +810,12 @@ function CustomersPage()  {
         </div>
       )}
 
-      <div style={{ background: 'linear-gradient(120deg, #1a1a2e 0%, #2d2b55 45%, #4f46e5 100%)', color: 'white', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(79,70,229,0.25)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: '-40px', right: '80px', width: '200px', height: '200px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.35), transparent 70%)' }} />
+      <div style={{ padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' }}>
-          <span onClick={() => router.push('/reservations')} style={{ cursor: 'pointer', fontSize: '20px' }}>←</span>
-          <div><div style={{ fontSize: '19px', fontWeight: 'bold' }}>👤 顧客台帳</div><div style={{ fontSize: '12px', opacity: 0.75 }}>登録顧客: {customers.length}名 ・ {bt.icon} {bt.label}</div></div>
+          <div><div style={{ fontSize: '19px', fontWeight: 'bold', color: '#1a1a2e' }}>👤 顧客台帳</div><div style={{ fontSize: '12px', color: '#6b7280' }}>登録顧客: {customers.length}名 ・ {bt.icon} {bt.label}</div></div>
         </div>
         <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
-          <button onClick={() => { setViewMode(viewMode === 'monthly' ? 'list' : 'monthly'); setSelectedMonth(null); }} style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: viewMode === 'monthly' ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', backdropFilter: 'blur(4px)' }}>📅 月別</button>
+          <button onClick={() => { setViewMode(viewMode === 'monthly' ? 'list' : 'monthly'); setSelectedMonth(null); }} style={{ padding: '9px 16px', borderRadius: '10px', border: '2px solid #6366f1', background: viewMode === 'monthly' ? '#6366f1' : 'white', color: viewMode === 'monthly' ? 'white' : '#6366f1', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>📅 月別</button>
           <button onClick={() => router.push('/customer-register')} style={{ padding: '9px 18px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 4px 12px rgba(16,185,129,0.4)' }}>＋ 新規登録</button>
         </div>
       </div>
