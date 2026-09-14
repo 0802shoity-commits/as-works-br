@@ -280,7 +280,7 @@ export default function CustomerRegisterPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa', fontFamily: "'Segoe UI', sans-serif" }}>
-      <div style={{ background: 'linear-gradient(135deg, #1a1a2e, #0f3460)', color: 'white', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ background: 'transparent(135deg, #1a1a2e, #0f3460)', color: '#1a1a2e', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <span onClick={() => router.back()} style={{ cursor: 'pointer', fontSize: '20px' }}>←</span>
         <div>
           <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{editId ? '顧客編集' : '顧客登録'}</div>

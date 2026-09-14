@@ -810,15 +810,6 @@ function CustomersPage()  {
         </div>
       )}
 
-      <div style={{ padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' }}>
-          <div><div style={{ fontSize: '19px', fontWeight: 'bold', color: '#1a1a2e' }}>👤 顧客台帳</div><div style={{ fontSize: '12px', color: '#6b7280' }}>登録顧客: {customers.length}名 ・ {bt.icon} {bt.label}</div></div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
-          <button onClick={() => { setViewMode(viewMode === 'monthly' ? 'list' : 'monthly'); setSelectedMonth(null); }} style={{ padding: '9px 16px', borderRadius: '10px', border: '2px solid #6366f1', background: viewMode === 'monthly' ? '#6366f1' : 'white', color: viewMode === 'monthly' ? 'white' : '#6366f1', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>📅 月別</button>
-          <button onClick={() => router.push('/customer-register')} style={{ padding: '9px 18px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 4px 12px rgba(16,185,129,0.4)' }}>＋ 新規登録</button>
-        </div>
-      </div>
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
