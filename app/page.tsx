@@ -25,7 +25,7 @@ export default function LandingPage() {
 
       {/* ヘッダー */}
       <header style={{ padding: "16px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f0f0f0", position: "sticky", top: 0, background: "rgba(255,255,255,0.95)", backdropFilter: "blur(8px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0px", fontSize: "22px", fontWeight: "bold", color: "#1a1a2e" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0px", fontSize: "22px", fontWeight: "bold", color: "#1a1a2e", whiteSpace: "nowrap" }}>
           <img src="/awwork.png" alt="As-Works" style={{ width: "50px", height: "50px", objectFit: "contain", mixBlendMode: "multiply", marginRight: "-4px" }} />
           -Works
         </div>
@@ -33,9 +33,6 @@ export default function LandingPage() {
           <button onClick={() => router.push("/login")} style={{ padding: "10px 24px", borderRadius: "10px", border: "2px solid #6366f1", background: "white", color: "#6366f1", fontSize: "14px", fontWeight: "bold", cursor: "pointer" }}>ログイン</button>
           <button onClick={() => router.push("/login")} style={{ padding: "10px 24px", borderRadius: "10px", border: "none", background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "white", fontSize: "14px", fontWeight: "bold", cursor: "pointer", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }}>無料で始める</button>
         </div>
-        <div style={{ marginTop: "60px", maxWidth: "1000px", margin: "60px auto 0", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", border: "2px solid #e5e7eb" }}>
-  <img src="/screenshot-dashboard.png" alt="As-Works ダッシュボード画面" style={{ width: "100%", display: "block" }} />
-</div>
       </header>
 
       {/* ヒーロー */}
@@ -57,6 +54,10 @@ export default function LandingPage() {
               無料で始める →
             </button>
           </div>
+        </div>
+        {/* ダッシュボードスクリーンショット */}
+        <div style={{ marginTop: "60px", maxWidth: "1000px", marginLeft: "auto", marginRight: "auto", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", border: "2px solid #e5e7eb" }}>
+          <img src="/screenshot-dashboard.png" alt="As-Works ダッシュボード画面" style={{ width: "100%", display: "block" }} />
         </div>
       </section>
 
