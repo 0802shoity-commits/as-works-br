@@ -1,18 +1,16 @@
-import { MetadataRoute } from 'next';
-
-export default function sitemap(): MetadataRoute.Sitemap {
+export default function sitemap() {
   return [
     {
-      url: 'https://as-works-sigma.vercel.app',
+      url: 'https://asworks-tms.com',
       lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 1,
     },
     {
-      url: 'https://as-works-sigma.vercel.app/login',
+      url: 'https://asworks-tms.com/terms',
       lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.8,
     },
-  ];
+    {
+      url: 'https://asworks-tms.com/privacy',
+      lastModified: new Date(),
+    },
+  ]
 }
