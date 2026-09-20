@@ -134,6 +134,11 @@ export default function LandingPage() {
 
       {/* フッター */}
       <footer style={{ padding: "30px 40px", background: "#0f172a", textAlign: "center" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: "24px", marginBottom: "12px" }}>
+          <a href="/terms" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>利用規約</a>
+          <a href="/privacy" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>プライバシーポリシー</a>
+          <a href="/tokushoho" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>特定商取引法に基づく表記</a>
+        </div>
         <div style={{ fontSize: "13px", color: "#64748b" }}>© 2026 As-Works. All rights reserved.</div>
       </footer>
     </div>
