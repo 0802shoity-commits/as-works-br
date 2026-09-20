@@ -12,5 +12,9 @@ export default function sitemap() {
       url: 'https://asworks-tms.com/privacy',
       lastModified: new Date(),
     },
+    {
+  url: 'https://asworks-tms.com/tokushoho',
+  lastModified: new Date(),
+},
   ]
 }
