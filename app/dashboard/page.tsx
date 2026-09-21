@@ -762,9 +762,8 @@ return (
         <div ref={menuRef} style={{ position: "relative" }}>
           <div onClick={() => setShowAccountMenu(!showAccountMenu)} style={{ width: "40px", height: "40px", borderRadius: "8px", background: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", cursor: "pointer" }}>{userInitial}</div>
           {showAccountMenu && (<div style={{ position: "absolute", top: "50px", right: "0", width: isHelpView ? "320px" : "260px", background: "white", borderRadius: "12px", boxShadow: "0 10px 30px rgba(0,0,0,0.15)", border: "1px solid #eee", overflow: "hidden" }}>{!isSettingView ? (<><div style={{ padding: "15px", background: "#fcfcfc", borderBottom: "2px solid #e0e0e0" }}><div style={{ fontWeight: "bold", fontSize: "14px" }}>{userName}</div>
-<div style={{ fontSize: "11px", color: "#888" }}>{userEmail}</div></div><div style={{ padding: "5px 0" }}><div onClick={() => { setShowUpgrade(true); setShowAccountMenu(false); }} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px" }}>⭐ 有料プラン</div><div onClick={() => setIsSettingView(true)} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px" }}>⚙️ 設定</div><div onClick={async () => {
-  if (!window.confirm("本当に退会しますか？\n\n・すべてのデータが削除されます\n・この操作は取り消せません")) return;
-  if (!window.confirm("最終確認：退会すると予約・顧客データがすべて削除されます。よろしいですか？")) return;
+<div style={{ fontSize: "11px", color: "#888" }}>{userEmail}</div></div><div style={{ padding: "5px 0" }}><div onClick={() => { if (userPlan === 'premium') { alert('✅ プレミアム会員済みです'); setShowAccountMenu(false); } else { setShowUpgrade(true); setShowAccountMenu(false); } }} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px" }}>⭐ 有料プラン {userPlan === 'premium' && <span style={{ fontSize: "11px", color: "#10b981", marginLeft: "4px" }}>✅ 加入中</span>}</div><div onClick={() => setIsSettingView(true)} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px" }}>⚙️ 設定</div><div onClick={async () => {
+
   if (!userId) return;
   try {
     await supabase.from('appointments').delete().eq('user_id', userId);
@@ -807,6 +806,33 @@ return (
 </div>
 
 <div onClick={() => setIsHelpView(true)} style={{ padding: "10px", textAlign: "center", borderRadius: "8px", border: "2px solid #6366f1", color: "#6366f1", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>📩 ヘルプ・お問い合わせ</div>
+<div onClick={async () => {
+  const input = window.prompt("本当に退会しますか？\n\n・すべてのデータが削除されます\n・この操作は取り消せません\n\n確認のため「退会」と入力してください：");
+  if (input !== "退会") { if (input !== null) alert("入力が一致しません。"); return; }
+  if (!userId) return;
+  try {
+    await supabase.from('appointments').delete().eq('user_id', userId);
+    await supabase.from('staff_attendance').delete().eq('user_id', userId);
+    await supabase.from('staff_members').delete().eq('user_id', userId);
+    await supabase.from('work_categories').delete().eq('user_id', userId);
+    await supabase.from('user_plans').delete().eq('user_id', userId);
+    await supabase.from('user_settings').delete().eq('user_id', userId);
+    await supabase.from('customers').delete().eq('user_id', userId);
+    await supabase.from('customer_actions').delete().eq('user_id', userId);
+    await supabase.from('customer_action_logs').delete().eq('user_id', userId);
+    await supabase.from('customer_reservations').delete().eq('owner_id', userId);
+    await supabase.from('customer_work_history').delete().eq('user_id', userId);
+    await supabase.from('feedback_messages').delete().eq('user_id', userId);
+    await supabase.from('blocked_slots').delete().eq('user_id', userId);
+    await supabase.from('calendar_events').delete().eq('user_id', userId);
+    await supabase.from('shift_data').delete().eq('user_id', userId);
+    await supabase.from('profiles').delete().eq('id', userId);
+    await supabase.auth.signOut();
+    router.push('/');
+  } catch (e) {
+    alert('退会処理中にエラーが発生しました。サポートまでお問い合わせください。');
+  }
+}} style={{ padding: "10px", textAlign: "center", borderRadius: "8px", border: "2px solid #ef4444", color: "#ef4444", cursor: "pointer", fontSize: "13px", fontWeight: "bold", marginTop: "8px" }}>⚠️ 退会する</div>
 </>) : (<>
 <div style={{ fontSize: "12px", color: "#888" }}>不具合・ご要望はこちらから送信できます。内容は開発者に通知されます。</div>
 <div>

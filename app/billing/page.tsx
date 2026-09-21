@@ -111,17 +111,18 @@ export default function BillingPage() {
     <>
       {/* 印刷用スタイル */}
       <style>{`
-        @media print {
-          body { background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print { display: none !important; }
-          .print-area { background: #fff !important; color: #000 !important; padding: 20px !important; }
-          .print-area * { color: #000 !important; border-color: #ccc !important; }
-          .print-area h1, .print-area h3 { color: #1a1a2e !important; }
-          .plan-card { background: #f8f9fa !important; border: 1px solid #ccc !important; }
-          .plan-card span, .plan-card div { color: #333 !important; }
-          .plan-label { color: #666 !important; }
-        }
-      `}</style>
+  @media print {
+    body { background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none !important; }
+    .print-header { display: block !important; }
+    .print-area { background: #fff !important; color: #000 !important; padding: 20px !important; }
+    .print-area * { color: #000 !important; border-color: #ccc !important; background: transparent !important; }
+    .print-area h1, .print-area h3 { color: #1a1a2e !important; }
+    .plan-card { background: #f8f9fa !important; border: 1px solid #ccc !important; }
+    .plan-card span, .plan-card div { color: #333 !important; }
+    .plan-label { color: #666 !important; }
+  }
+`}</style>
 
       <div className="print-area" style={{ background: "#0f172a", minHeight: "100vh", padding: "24px", color: "#fff" }}>
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
@@ -133,7 +134,7 @@ export default function BillingPage() {
           </div>
 
           {/* 印刷用ヘッダー */}
-          <div style={{ display: "none" }} className="print-header">
+          <div className="no-screen print-header">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 16, borderBottom: "2px solid #1a1a2e" }}>
               <div>
                 <h1 style={{ margin: 0, fontSize: 24 }}>請求明細書</h1>
