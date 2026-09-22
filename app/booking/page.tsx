@@ -50,8 +50,10 @@ export default function BookingPage() {
     const loadOwnerData = async () => {
       try {
         const { data: settingsData } = await supabase
-          .from('user_settings').select('business_type, shop_name, shop_description, shop_bg_color, shop_image_url, shop_name_size, shop_desc_size, shop_image_size, shop_image_x').eq('user_id', id).maybeSingle();
+          .from('user_settings').select('business_type, start_hour, end_hour, shop_name, shop_description, shop_bg_color, shop_image_url, shop_name_size, shop_desc_size, shop_image_size, shop_image_x').eq('user_id', id).maybeSingle();
         if (settingsData?.business_type) setBusinessType(settingsData.business_type);
+if (settingsData?.start_hour != null) setOwnerStartHour(settingsData.start_hour);
+if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
         if (settingsData?.shop_name) setShopName(settingsData.shop_name);
         if (settingsData?.shop_description) setShopDescription(settingsData.shop_description);
         if (settingsData?.shop_bg_color) setShopBgColor(settingsData.shop_bg_color);
