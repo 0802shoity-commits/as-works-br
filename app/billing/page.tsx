@@ -111,10 +111,11 @@ export default function BillingPage() {
     <>
       {/* 印刷用スタイル */}
       <style>{`
+  .no-screen { display: none; }
   @media print {
     body { background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .no-print { display: none !important; }
-    .print-header { display: block !important; }
+    .no-screen { display: block !important; }
     .print-area { background: #fff !important; color: #000 !important; padding: 20px !important; }
     .print-area * { color: #000 !important; border-color: #ccc !important; background: transparent !important; }
     .print-area h1, .print-area h3 { color: #1a1a2e !important; }
