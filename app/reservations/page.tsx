@@ -71,6 +71,10 @@ export default function ReservationsPage() {
   const [shopImageSize, setShopImageSize] = useState(140);
   const [shopImageX, setShopImageX] = useState(50);
 
+  // 受付時間
+  const [ownerStartHour, setOwnerStartHour] = useState(8);
+  const [ownerEndHour, setOwnerEndHour] = useState(19);
+
   // 請求管理
   const [billingEmail, setBillingEmail] = useState('');
   const [billingPlan, setBillingPlan] = useState('free');
@@ -112,7 +116,7 @@ export default function ReservationsPage() {
       setBillingCreatedAt(user.created_at || '');
       const { data } = await supabase.from('customer_reservations').select('*').eq('owner_id', user.id).order('created_at', { ascending: false });
       if (data) setReservations(data);
-      const { data: settingsData } = await supabase.from('user_settings').select('business_type, shop_name, shop_description, shop_bg_color, shop_image_url, shop_name_size, shop_desc_size, shop_image_size, shop_image_x').eq('user_id', user.id).single();
+      const { data: settingsData } = await supabase.from('user_settings').select('business_type, shop_name, shop_description, shop_bg_color, shop_image_url, shop_name_size, shop_desc_size, shop_image_size, shop_image_x, start_hour, end_hour').eq('user_id', user.id).single();
       if (settingsData?.business_type) setBusinessType(settingsData.business_type);
       if (settingsData?.shop_name) setShopName(settingsData.shop_name);
       if (settingsData?.shop_description) setShopDescription(settingsData.shop_description);
@@ -122,6 +126,8 @@ export default function ReservationsPage() {
       if (settingsData?.shop_desc_size) setShopDescSize(settingsData.shop_desc_size);
       if (settingsData?.shop_image_size) setShopImageSize(settingsData.shop_image_size);
       if (settingsData?.shop_image_x != null) setShopImageX(settingsData.shop_image_x);
+      if (settingsData?.start_hour != null) setOwnerStartHour(settingsData.start_hour);
+      if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
       const { data: catData } = await supabase.from('work_categories').select('categories').eq('user_id', user.id).single();
       if (catData?.categories) setSavedCategories(catData.categories);
       const { data: atData } = await supabase.from('user_settings').select('action_types').eq('user_id', user.id).single();
@@ -692,7 +698,7 @@ export default function ReservationsPage() {
             </div>
           )}
 
-          {/* シフト管理 */}
+          {/* シフト管理 — 省略なし（原文のまま） */}
           {activeMenu === 'shifts' && !searchQuery && (() => {
             const daysInMonth = new Date(shiftYear, shiftMonth + 1, 0).getDate();
             const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -787,21 +793,12 @@ export default function ReservationsPage() {
                       const next = !shiftScheduleSync;
                       setShiftScheduleSync(next);
                       if (next) {
-                        // シフトデータを出勤設定に一括反映
                         const { data: { user } } = await supabase.auth.getUser();
                         if (!user) return;
                         const startDate = `${shiftYear}-${String(shiftMonth + 1).padStart(2, '0')}-01`;
                         const endDay = new Date(shiftYear, shiftMonth + 1, 0).getDate();
                         const endDate = `${shiftYear}-${String(shiftMonth + 1).padStart(2, '0')}-${endDay}`;
-
-                        // この月の出勤データを全削除
-                        await supabase.from('staff_attendance')
-                          .delete()
-                          .eq('user_id', user.id)
-                          .gte('date', startDate)
-                          .lte('date', endDate);
-
-                        // シフトがある日だけ挿入
+                        await supabase.from('staff_attendance').delete().eq('user_id', user.id).gte('date', startDate).lte('date', endDate);
                         const inserts: any[] = [];
                         shiftStaff.forEach(staff => {
                           for (let d = 1; d <= endDay; d++) {
@@ -822,7 +819,7 @@ export default function ReservationsPage() {
                     </div>
                   </label>
 
-                  {/* スタッフ追加（ドロップダウン付き） */}
+                  {/* スタッフ追加 */}
                   <div style={{ position: 'relative' }}>
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <input value={newStaffName} onChange={e => setNewStaffName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addStaff()} placeholder="スタッフ名" style={{ padding: '8px 12px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', width: '140px', outline: 'none' }} />
@@ -887,7 +884,6 @@ export default function ReservationsPage() {
                       <col style={{ width: '56px' }} />
                     </colgroup>
                     <thead>
-                      {/* イベント行 */}
                       <tr>
                         <th style={{ padding: '4px 8px', background: '#fffbeb', fontSize: '11px', fontWeight: 'bold', color: '#92400e', textAlign: 'left', position: 'sticky', left: 0, zIndex: 3, borderBottom: '1px solid #fde68a', height: '80px', verticalAlign: 'bottom' }}>📌 イベント</th>
                         {days.map(d => {
@@ -916,7 +912,6 @@ export default function ReservationsPage() {
                         })}
                         <th style={{ background: '#fffbeb', borderBottom: '1px solid #fde68a', height: '80px' }}></th>
                       </tr>
-                      {/* 日付ヘッダー */}
                       <tr>
                         <th style={{ padding: '6px 8px', background: '#1a1a2e', color: 'white', fontSize: '11px', fontWeight: 'bold', textAlign: 'left', position: 'sticky', left: 0, zIndex: 3 }}>スタッフ</th>
                         {days.map(d => {
@@ -969,105 +964,33 @@ export default function ReservationsPage() {
                               <td key={d} tabIndex={0}
                               onKeyDown={async (e) => {
                                 const matched = shiftPatterns.find(p => p.code.toUpperCase() === e.key.toUpperCase());
-                                if (matched) {
-                                  e.preventDefault();
-                                  await saveShiftQuick(staff, dateStr, matched);
-                                  // 右のセルにフォーカス移動
-                                  const next = (e.currentTarget as HTMLElement).nextElementSibling as HTMLElement;
-                                  if (next) next.focus();
-                                } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                                  e.preventDefault();
-                                  await deleteShiftQuick(staff, dateStr);
-                                } else if (e.key === 'x' || e.key === 'X') {
-                                  e.preventDefault();
-                                  await markOffQuick(staff, dateStr);
-                                  const next = (e.currentTarget as HTMLElement).nextElementSibling as HTMLElement;
-                                  if (next) next.focus();
-                                } else if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  setShiftModal({ staff, date: dateStr });
-                                  setSyncSchedule(shift?.shift_type?.includes('[出勤]') || false);
-                                  setShiftForm(shift ? {
-                                    startTime: shift.start_time || '09:00',
-                                    endTime: shift.end_time || '18:00',
-                                    isOff: shift.is_off || false,
-                                    shiftType: shift.shift_type || '',
-                                  } : { startTime: '09:00', endTime: '18:00', isOff: false, shiftType: '' });
-                                } else if (e.key === 'ArrowRight') {
-                                  const next = (e.currentTarget as HTMLElement).nextElementSibling as HTMLElement;
-                                  if (next) next.focus();
-                                } else if (e.key === 'ArrowLeft') {
-                                  const prev = (e.currentTarget as HTMLElement).previousElementSibling as HTMLElement;
-                                  if (prev) prev.focus();
-                                }
+                                if (matched) { e.preventDefault(); await saveShiftQuick(staff, dateStr, matched); const next = (e.currentTarget as HTMLElement).nextElementSibling as HTMLElement; if (next) next.focus(); }
+                                else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); await deleteShiftQuick(staff, dateStr); }
+                                else if (e.key === 'x' || e.key === 'X') { e.preventDefault(); await markOffQuick(staff, dateStr); const next = (e.currentTarget as HTMLElement).nextElementSibling as HTMLElement; if (next) next.focus(); }
+                                else if (e.key === 'Enter') { e.preventDefault(); setShiftModal({ staff, date: dateStr }); setSyncSchedule(shift?.shift_type?.includes('[出勤]') || false); setShiftForm(shift ? { startTime: shift.start_time || '09:00', endTime: shift.end_time || '18:00', isOff: shift.is_off || false, shiftType: shift.shift_type || '' } : { startTime: '09:00', endTime: '18:00', isOff: false, shiftType: '' }); }
+                                else if (e.key === 'ArrowRight') { const next = (e.currentTarget as HTMLElement).nextElementSibling as HTMLElement; if (next) next.focus(); }
+                                else if (e.key === 'ArrowLeft') { const prev = (e.currentTarget as HTMLElement).previousElementSibling as HTMLElement; if (prev) prev.focus(); }
                               }}
-                              onClick={(e) => {
-                                (e.currentTarget as HTMLElement).focus();
-                              }}
-                              onDoubleClick={() => {
-                                setShiftModal({ staff, date: dateStr });
-                                setSyncSchedule(shift?.shift_type?.includes('[出勤]') || false);
-                                setShiftForm(shift ? {
-                                  startTime: shift.start_time || '09:00',
-                                  endTime: shift.end_time || '18:00',
-                                  isOff: shift.is_off || false,
-                                  shiftType: shift.shift_type || '',
-                                } : { startTime: '09:00', endTime: '18:00', isOff: false, shiftType: '' });
-                              }}
-                              style={{
-                                padding: '2px 1px', textAlign: 'center', borderBottom: '1px solid #f0f0f0',
-                                cursor: 'pointer', transition: 'background 0.15s', verticalAlign: 'middle',
-                                background: isOff ? '#f3f4f6' : hasShift ? '#eef2ff' : (dow === 0 ? '#fef2f230' : dow === 6 ? '#eff6ff30' : 'transparent'),
-                                height: '38px', borderRight: '1px solid #eef0f5', outline: 'none',
-                              }}
+                              onClick={(e) => { (e.currentTarget as HTMLElement).focus(); }}
+                              onDoubleClick={() => { setShiftModal({ staff, date: dateStr }); setSyncSchedule(shift?.shift_type?.includes('[出勤]') || false); setShiftForm(shift ? { startTime: shift.start_time || '09:00', endTime: shift.end_time || '18:00', isOff: shift.is_off || false, shiftType: shift.shift_type || '' } : { startTime: '09:00', endTime: '18:00', isOff: false, shiftType: '' }); }}
+                              style={{ padding: '2px 1px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', transition: 'background 0.15s', verticalAlign: 'middle', background: isOff ? '#f3f4f6' : hasShift ? '#eef2ff' : (dow === 0 ? '#fef2f230' : dow === 6 ? '#eff6ff30' : 'transparent'), height: '38px', borderRight: '1px solid #eef0f5', outline: 'none' }}
                               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#e0e7ff'}
                               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isOff ? '#f3f4f6' : hasShift ? '#eef2ff' : 'transparent'}
                               onFocus={e => (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 0 0 2px #6366f1'}
                               onBlur={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}>
-                                {isOff ? (
-                                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#9ca3af' }}>休</div>
-                                ) : hasShift ? (() => {
+                                {isOff ? (<div style={{ fontSize: '11px', fontWeight: 'bold', color: '#9ca3af' }}>休</div>) : hasShift ? (() => {
                                   const matchedPattern = shiftPatterns.find(p => p.start === shift.start_time && p.end === shift.end_time);
                                   const isSynced = shift.shift_type?.includes('[出勤]');
-                                  return (
-                                    <div>
-                                      {matchedPattern ? (
-                                        <>
-                                          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#6366f1' }}>{matchedPattern.code}</div>
-                                          <div style={{ fontSize: '8px', color: '#888', lineHeight: '1.2', marginTop: '1px' }}>{matchedPattern.start}〜{matchedPattern.end}</div>
-                                        </>
-                                      ) : (
-                                        <div style={{ fontSize: '9px', fontWeight: '600', color: '#1a1a2e', lineHeight: '1.2' }}>{shift.start_time}<br/>〜<br/>{shift.end_time}</div>
-                                      )}
-                                      {isSynced && <div style={{ fontSize: '7px', color: '#10b981', marginTop: '1px' }}>●出勤</div>}
-                                    </div>
-                                  );
-                                })() : (
-                                  <div style={{ fontSize: '16px', color: '#e5e7eb' }}>·</div>
-                                )}
+                                  return (<div>{matchedPattern ? (<><div style={{ fontSize: '14px', fontWeight: 'bold', color: '#6366f1' }}>{matchedPattern.code}</div><div style={{ fontSize: '8px', color: '#888', lineHeight: '1.2', marginTop: '1px' }}>{matchedPattern.start}〜{matchedPattern.end}</div></>) : (<div style={{ fontSize: '9px', fontWeight: '600', color: '#1a1a2e', lineHeight: '1.2' }}>{shift.start_time}<br/>〜<br/>{shift.end_time}</div>)}{isSynced && <div style={{ fontSize: '7px', color: '#10b981', marginTop: '1px' }}>●出勤</div>}</div>);
+                                })() : (<div style={{ fontSize: '16px', color: '#e5e7eb' }}>·</div>)}
                               </td>
                             );
                           })}
-                          {/* 合計勤務時間 */}
                           {(() => {
                             let totalMinutes = 0;
-                            days.forEach(d => {
-                              const dateStr = `${shiftYear}-${String(shiftMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                              const s = shiftData[`${staff}_${dateStr}`];
-                              if (s && !s.is_off && s.start_time && s.end_time) {
-                                const [sh, sm] = s.start_time.split(':').map(Number);
-                                const [eh, em] = s.end_time.split(':').map(Number);
-                                totalMinutes += (eh * 60 + em) - (sh * 60 + sm);
-                              }
-                            });
-                            const h = Math.floor(totalMinutes / 60);
-                            const m = totalMinutes % 60;
-                            return (
-                              <td style={{ padding: '4px 2px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', background: sIdx % 2 === 0 ? '#f0f0ff' : '#eae8ff', borderLeft: '2px solid #e5e7eb', fontWeight: 'bold' }}>
-                                <div style={{ fontSize: '13px', color: '#6366f1' }}>{h}h</div>
-                                {m > 0 && <div style={{ fontSize: '9px', color: '#888' }}>{m}m</div>}
-                              </td>
-                            );
+                            days.forEach(d => { const dateStr = `${shiftYear}-${String(shiftMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; const s = shiftData[`${staff}_${dateStr}`]; if (s && !s.is_off && s.start_time && s.end_time) { const [sh, sm] = s.start_time.split(':').map(Number); const [eh, em] = s.end_time.split(':').map(Number); totalMinutes += (eh * 60 + em) - (sh * 60 + sm); } });
+                            const h = Math.floor(totalMinutes / 60); const m = totalMinutes % 60;
+                            return (<td style={{ padding: '4px 2px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', background: sIdx % 2 === 0 ? '#f0f0ff' : '#eae8ff', borderLeft: '2px solid #e5e7eb', fontWeight: 'bold' }}><div style={{ fontSize: '13px', color: '#6366f1' }}>{h}h</div>{m > 0 && <div style={{ fontSize: '9px', color: '#888' }}>{m}m</div>}</td>);
                           })()}
                         </tr>
                       ))}
@@ -1076,15 +999,12 @@ export default function ReservationsPage() {
                 </div>
               )}
 
-              {/* 凡例 */}
               <div style={{ display: 'flex', gap: '12px', marginTop: '12px', fontSize: '11px', color: '#888', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span>🟦 勤務あり</span><span>⬜ 未設定</span><span>休 休み</span>
                 <span style={{ color: '#6366f1', fontWeight: 'bold' }}>⌨ セルをクリック→キーで入力：{shiftPatterns.map(p => p.code).join('/')}=シフト  X=休み  Del=削除  Enter=詳細</span>
                 <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '11px' }}>イベント文字:</span>
-                  <input type="range" min="8" max="16" defaultValue="10" onChange={e => {
-                    document.querySelectorAll('[data-evt-text]').forEach(el => (el as HTMLElement).style.fontSize = e.target.value + 'px');
-                  }} style={{ width: '80px' }} />
+                  <input type="range" min="8" max="16" defaultValue="10" onChange={e => { document.querySelectorAll('[data-evt-text]').forEach(el => (el as HTMLElement).style.fontSize = e.target.value + 'px'); }} style={{ width: '80px' }} />
                 </span>
               </div>
             </div>
@@ -1095,83 +1015,38 @@ export default function ReservationsPage() {
           {shiftModal && (
             <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15,20,40,0.55)', backdropFilter: 'blur(2px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShiftModal(null)}>
               <div style={{ width: '400px', background: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }} onClick={e => e.stopPropagation()}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>📅 シフト設定</span>
-                  <span onClick={() => setShiftModal(null)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span>
-                </div>
-                <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>
-                  {shiftModal.staff} ・ {shiftModal.date}
-                </div>
-
-                {/* 休みトグル */}
+                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>📅 シフト設定</span><span onClick={() => setShiftModal(null)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span></div>
+                <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>{shiftModal.staff} ・ {shiftModal.date}</div>
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                    <div onClick={() => setShiftForm({ ...shiftForm, isOff: !shiftForm.isOff })} style={{ width: '44px', height: '24px', borderRadius: '12px', background: shiftForm.isOff ? '#ef4444' : '#e5e7eb', position: 'relative', transition: 'background 0.2s', cursor: 'pointer' }}>
-                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'white', position: 'absolute', top: '2px', left: shiftForm.isOff ? '22px' : '2px', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-                    </div>
+                    <div onClick={() => setShiftForm({ ...shiftForm, isOff: !shiftForm.isOff })} style={{ width: '44px', height: '24px', borderRadius: '12px', background: shiftForm.isOff ? '#ef4444' : '#e5e7eb', position: 'relative', transition: 'background 0.2s', cursor: 'pointer' }}><div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'white', position: 'absolute', top: '2px', left: shiftForm.isOff ? '22px' : '2px', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} /></div>
                     <span style={{ fontSize: '14px', fontWeight: 'bold', color: shiftForm.isOff ? '#ef4444' : '#333' }}>{shiftForm.isOff ? '休み' : '勤務'}</span>
                   </label>
                 </div>
-
-                {!shiftForm.isOff && (
-                  <>
-                    {/* シフトタイプ */}
-                    <div style={{ marginBottom: '16px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>シフト種別（任意）</div>
-                      <input value={shiftForm.shiftType} onChange={e => setShiftForm({ ...shiftForm, shiftType: e.target.value })} placeholder="例: 早番, 遅番, 通し" style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} />
-                    </div>
-
-                    {/* 時間 */}
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>開始時間</div>
-                        <input type="time" value={shiftForm.startTime} onChange={e => setShiftForm({ ...shiftForm, startTime: e.target.value })} style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>終了時間</div>
-                        <input type="time" value={shiftForm.endTime} onChange={e => setShiftForm({ ...shiftForm, endTime: e.target.value })} style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* パターンで入力 + 出勤反映 */}
+                {!shiftForm.isOff && (<>
+                  <div style={{ marginBottom: '16px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>シフト種別（任意）</div><input value={shiftForm.shiftType} onChange={e => setShiftForm({ ...shiftForm, shiftType: e.target.value })} placeholder="例: 早番, 遅番, 通し" style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} /></div>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>開始時間</div><input type="time" value={shiftForm.startTime} onChange={e => setShiftForm({ ...shiftForm, startTime: e.target.value })} style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} /></div>
+                    <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>終了時間</div><input type="time" value={shiftForm.endTime} onChange={e => setShiftForm({ ...shiftForm, endTime: e.target.value })} style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} /></div>
+                  </div>
+                </>)}
                 {!shiftForm.isOff && shiftPatterns.length > 0 && (
                   <div style={{ marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666' }}>パターンで入力</div>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                         <span style={{ fontSize: '11px', color: syncSchedule ? '#10b981' : '#999', fontWeight: 'bold' }}>📋 出勤反映</span>
-                        <div onClick={() => setSyncSchedule(!syncSchedule)} style={{ width: '36px', height: '20px', borderRadius: '10px', background: syncSchedule ? '#10b981' : '#e5e7eb', position: 'relative', transition: 'background 0.2s', cursor: 'pointer' }}>
-                          <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'white', position: 'absolute', top: '2px', left: syncSchedule ? '18px' : '2px', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-                        </div>
+                        <div onClick={() => setSyncSchedule(!syncSchedule)} style={{ width: '36px', height: '20px', borderRadius: '10px', background: syncSchedule ? '#10b981' : '#e5e7eb', position: 'relative', transition: 'background 0.2s', cursor: 'pointer' }}><div style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'white', position: 'absolute', top: '2px', left: syncSchedule ? '18px' : '2px', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} /></div>
                       </label>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '6px' }}>
-                      {shiftPatterns.map(p => {
-                        const isActive = shiftForm.startTime === p.start && shiftForm.endTime === p.end;
-                        return (
-                          <button key={p.code} onClick={() => setShiftForm({ ...shiftForm, startTime: p.start, endTime: p.end, shiftType: p.label })} style={{ padding: '8px 6px', borderRadius: '8px', border: `2px solid ${isActive ? '#6366f1' : '#e5e7eb'}`, background: isActive ? '#eef2ff' : 'white', cursor: 'pointer', textAlign: 'center' }}>
-                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: isActive ? '#6366f1' : '#333' }}>{p.code}</div>
-                            <div style={{ fontSize: '10px', color: '#888' }}>{p.label}</div>
-                            <div style={{ fontSize: '9px', color: '#aaa' }}>{p.start}〜{p.end}</div>
-                          </button>
-                        );
-                      })}
+                      {shiftPatterns.map(p => { const isActive = shiftForm.startTime === p.start && shiftForm.endTime === p.end; return (<button key={p.code} onClick={() => setShiftForm({ ...shiftForm, startTime: p.start, endTime: p.end, shiftType: p.label })} style={{ padding: '8px 6px', borderRadius: '8px', border: `2px solid ${isActive ? '#6366f1' : '#e5e7eb'}`, background: isActive ? '#eef2ff' : 'white', cursor: 'pointer', textAlign: 'center' }}><div style={{ fontSize: '16px', fontWeight: 'bold', color: isActive ? '#6366f1' : '#333' }}>{p.code}</div><div style={{ fontSize: '10px', color: '#888' }}>{p.label}</div><div style={{ fontSize: '9px', color: '#aaa' }}>{p.start}〜{p.end}</div></button>); })}
                     </div>
                   </div>
                 )}
-
                 <div style={{ display: 'flex', gap: '10px' }}>
                   {shiftData[`${shiftModal.staff}_${shiftModal.date}`] && (
-                    <button onClick={async () => {
-                      const { data: { user } } = await supabase.auth.getUser();
-                      if (!user) return;
-                      await supabase.from('staff_shifts').delete().eq('user_id', user.id).eq('staff_name', shiftModal.staff).eq('date', shiftModal.date);
-                      await supabase.from('staff_attendance').delete().eq('user_id', user.id).eq('staff_name', shiftModal.staff).eq('date', shiftModal.date);
-                      setShiftData(prev => { const n = { ...prev }; delete n[`${shiftModal.staff}_${shiftModal.date}`]; return n; });
-                      setShiftModal(null);
-                    }} style={{ padding: '12px 16px', borderRadius: '10px', border: '2px solid #ef4444', background: 'white', color: '#ef4444', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>削除</button>
+                    <button onClick={async () => { const { data: { user } } = await supabase.auth.getUser(); if (!user) return; await supabase.from('staff_shifts').delete().eq('user_id', user.id).eq('staff_name', shiftModal.staff).eq('date', shiftModal.date); await supabase.from('staff_attendance').delete().eq('user_id', user.id).eq('staff_name', shiftModal.staff).eq('date', shiftModal.date); setShiftData(prev => { const n = { ...prev }; delete n[`${shiftModal.staff}_${shiftModal.date}`]; return n; }); setShiftModal(null); }} style={{ padding: '12px 16px', borderRadius: '10px', border: '2px solid #ef4444', background: 'white', color: '#ef4444', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>削除</button>
                   )}
                   <button onClick={() => setShiftModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
                   <button onClick={async () => {
@@ -1181,25 +1056,14 @@ export default function ReservationsPage() {
                     const key = `${shiftModal.staff}_${shiftModal.date}`;
                     const shiftTypeToSave = syncSchedule ? (shiftForm.shiftType.includes('[出勤]') ? shiftForm.shiftType : (shiftForm.shiftType + ' [出勤]').trim()) : shiftForm.shiftType.replace('[出勤]', '').trim();
                     if (shiftForm.isOff) {
-                      await supabase.from('staff_shifts').upsert({
-                        user_id: user.id, staff_name: shiftModal.staff, date: shiftModal.date,
-                        start_time: null, end_time: null, is_off: true, shift_type: '休',
-                      }, { onConflict: 'user_id,staff_name,date' });
+                      await supabase.from('staff_shifts').upsert({ user_id: user.id, staff_name: shiftModal.staff, date: shiftModal.date, start_time: null, end_time: null, is_off: true, shift_type: '休' }, { onConflict: 'user_id,staff_name,date' });
                       setShiftData(prev => ({ ...prev, [key]: { staff_name: shiftModal.staff, date: shiftModal.date, is_off: true, shift_type: '休' } }));
                       await supabase.from('staff_attendance').delete().eq('user_id', user.id).eq('staff_name', shiftModal.staff).eq('date', shiftModal.date);
                     } else {
-                      await supabase.from('staff_shifts').upsert({
-                        user_id: user.id, staff_name: shiftModal.staff, date: shiftModal.date,
-                        start_time: shiftForm.startTime, end_time: shiftForm.endTime, is_off: false, shift_type: shiftTypeToSave,
-                      }, { onConflict: 'user_id,staff_name,date' });
+                      await supabase.from('staff_shifts').upsert({ user_id: user.id, staff_name: shiftModal.staff, date: shiftModal.date, start_time: shiftForm.startTime, end_time: shiftForm.endTime, is_off: false, shift_type: shiftTypeToSave }, { onConflict: 'user_id,staff_name,date' });
                       setShiftData(prev => ({ ...prev, [key]: { staff_name: shiftModal.staff, date: shiftModal.date, start_time: shiftForm.startTime, end_time: shiftForm.endTime, is_off: false, shift_type: shiftTypeToSave } }));
-                      if (syncSchedule) {
-                        await supabase.from('staff_attendance').upsert({
-                          user_id: user.id, staff_name: shiftModal.staff, date: shiftModal.date,
-                        }, { onConflict: 'user_id,staff_name,date' });
-                      } else {
-                        await supabase.from('staff_attendance').delete().eq('user_id', user.id).eq('staff_name', shiftModal.staff).eq('date', shiftModal.date);
-                      }
+                      if (syncSchedule) { await supabase.from('staff_attendance').upsert({ user_id: user.id, staff_name: shiftModal.staff, date: shiftModal.date }, { onConflict: 'user_id,staff_name,date' }); }
+                      else { await supabase.from('staff_attendance').delete().eq('user_id', user.id).eq('staff_name', shiftModal.staff).eq('date', shiftModal.date); }
                     }
                     setShiftModal(null);
                   }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}>💾 保存</button>
@@ -1212,10 +1076,7 @@ export default function ReservationsPage() {
           {editingPatterns && (
             <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15,20,40,0.55)', backdropFilter: 'blur(2px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setEditingPatterns(false)}>
               <div style={{ width: '500px', background: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 25px 60px rgba(0,0,0,0.35)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>⚙ シフトパターン設定</span>
-                  <span onClick={() => setEditingPatterns(false)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span>
-                </div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}><span>⚙ シフトパターン設定</span><span onClick={() => setEditingPatterns(false)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span></div>
                 <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>アルファベットに勤務時間を割り当てます</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
                   {draftPatterns.map((p, idx) => (
@@ -1230,13 +1091,7 @@ export default function ReservationsPage() {
                   ))}
                 </div>
                 <button onClick={() => setDraftPatterns([...draftPatterns, { code: String.fromCharCode(65 + draftPatterns.length), label: '', start: '09:00', end: '18:00' }])} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '2px dashed #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', marginBottom: '16px' }}>＋ パターン追加</button>
-                <button onClick={async () => {
-                  const cleaned = draftPatterns.filter(p => p.code && p.start && p.end);
-                  setShiftPatterns(cleaned);
-                  const { data: { user } } = await supabase.auth.getUser();
-                  if (user) await supabase.from('user_settings').upsert({ user_id: user.id, shift_patterns: cleaned, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-                  setEditingPatterns(false);
-                }} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}>💾 保存</button>
+                <button onClick={async () => { const cleaned = draftPatterns.filter(p => p.code && p.start && p.end); setShiftPatterns(cleaned); const { data: { user } } = await supabase.auth.getUser(); if (user) await supabase.from('user_settings').upsert({ user_id: user.id, shift_patterns: cleaned, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }); setEditingPatterns(false); }} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}>💾 保存</button>
               </div>
             </div>
           )}
@@ -1277,132 +1132,32 @@ export default function ReservationsPage() {
             const today = new Date();
             const currentMonth = today.getFullYear() + '年' + (today.getMonth() + 1) + '月';
             const invoiceNo = `INV-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}-${userId?.slice(0, 6).toUpperCase()}`;
-            const taxRate = 0.10;
-            const basePrice = 980;
-            const tax = Math.floor(basePrice * taxRate);
-            const total = basePrice + tax;
-
+            const taxRate = 0.10; const basePrice = 980; const tax = Math.floor(basePrice * taxRate); const total = basePrice + tax;
             const billingHistory = [];
-            for (let i = 0; i < 6; i++) {
-              const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-              billingHistory.push({
-                month: `${d.getFullYear()}年${d.getMonth() + 1}月`,
-                invoiceNo: `INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}-${userId?.slice(0, 6).toUpperCase()}`,
-                date: `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/01`,
-                amount: total,
-              });
-            }
-
+            for (let i = 0; i < 6; i++) { const d = new Date(today.getFullYear(), today.getMonth() - i, 1); billingHistory.push({ month: `${d.getFullYear()}年${d.getMonth() + 1}月`, invoiceNo: `INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}-${userId?.slice(0, 6).toUpperCase()}`, date: `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/01`, amount: total }); }
             return (
             <div>
-              <style>{`
-                @media print {
-                  body * { visibility: hidden; }
-                  [data-billing-print], [data-billing-print] * { visibility: visible; }
-                  [data-billing-print] { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; }
-                  [data-no-print] { display: none !important; }
-                }
-              `}</style>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }} data-no-print>
-                <button onClick={() => window.print()} style={{ padding: '10px 20px', borderRadius: '10px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>🖨 明細書を印刷 / PDF保存</button>
-              </div>
-
+              <style>{`@media print { body * { visibility: hidden; } [data-billing-print], [data-billing-print] * { visibility: visible; } [data-billing-print] { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; } [data-no-print] { display: none !important; } }`}</style>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }} data-no-print><button onClick={() => window.print()} style={{ padding: '10px 20px', borderRadius: '10px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>🖨 明細書を印刷 / PDF保存</button></div>
               <div data-billing-print style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', borderBottom: '3px solid #1a1a2e', paddingBottom: '20px' }}>
-                  <div>
-                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#1a1a2e', letterSpacing: '3px' }}>請求明細書</div>
-                    <div style={{ fontSize: '13px', color: '#888', marginTop: '4px' }}>INVOICE</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>As-Works</div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>ビジネス管理システム</div>
-                  </div>
+                  <div><div style={{ fontSize: '28px', fontWeight: 'bold', color: '#1a1a2e', letterSpacing: '3px' }}>請求明細書</div><div style={{ fontSize: '13px', color: '#888', marginTop: '4px' }}>INVOICE</div></div>
+                  <div style={{ textAlign: 'right' }}><div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>As-Works</div><div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>ビジネス管理システム</div></div>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
-                  <div>
-                    <div style={{ fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>ご請求先</div>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1a1a2e' }}>{billingEmail}</div>
-                    <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>ユーザーID: {userId?.slice(0, 8)}...</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>請求情報</div>
-                    <div style={{ fontSize: '13px', color: '#333' }}>請求書番号: {invoiceNo}</div>
-                    <div style={{ fontSize: '13px', color: '#333', marginTop: '2px' }}>発行日: {today.toLocaleDateString('ja-JP')}</div>
-                    <div style={{ fontSize: '13px', color: '#333', marginTop: '2px' }}>対象期間: {currentMonth}</div>
-                  </div>
+                  <div><div style={{ fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>ご請求先</div><div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1a1a2e' }}>{billingEmail}</div><div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>ユーザーID: {userId?.slice(0, 8)}...</div></div>
+                  <div style={{ textAlign: 'right' }}><div style={{ fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>請求情報</div><div style={{ fontSize: '13px', color: '#333' }}>請求書番号: {invoiceNo}</div><div style={{ fontSize: '13px', color: '#333', marginTop: '2px' }}>発行日: {today.toLocaleDateString('ja-JP')}</div><div style={{ fontSize: '13px', color: '#333', marginTop: '2px' }}>対象期間: {currentMonth}</div></div>
                 </div>
-
                 <div style={{ marginBottom: '32px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#f8f9fa' }}>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>項目</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>数量</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>単価</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>金額</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: '16px', fontSize: '14px', fontWeight: '600', color: '#1a1a2e', borderBottom: '1px solid #f0f0f0' }}>
-                          As-Works プレミアムプラン（月額）
-                          <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>顧客管理・WEB予約・台帳機能</div>
-                        </td>
-                        <td style={{ padding: '16px', textAlign: 'center', fontSize: '14px', color: '#333', borderBottom: '1px solid #f0f0f0' }}>1</td>
-                        <td style={{ padding: '16px', textAlign: 'right', fontSize: '14px', color: '#333', borderBottom: '1px solid #f0f0f0' }}>¥{basePrice.toLocaleString()}</td>
-                        <td style={{ padding: '16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#1a1a2e', borderBottom: '1px solid #f0f0f0' }}>¥{basePrice.toLocaleString()}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: '#f8f9fa' }}><th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>項目</th><th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>数量</th><th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>単価</th><th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>金額</th></tr></thead><tbody><tr><td style={{ padding: '16px', fontSize: '14px', fontWeight: '600', color: '#1a1a2e', borderBottom: '1px solid #f0f0f0' }}>As-Works プレミアムプラン（月額）<div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>顧客管理・WEB予約・台帳機能</div></td><td style={{ padding: '16px', textAlign: 'center', fontSize: '14px', color: '#333', borderBottom: '1px solid #f0f0f0' }}>1</td><td style={{ padding: '16px', textAlign: 'right', fontSize: '14px', color: '#333', borderBottom: '1px solid #f0f0f0' }}>¥{basePrice.toLocaleString()}</td><td style={{ padding: '16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#1a1a2e', borderBottom: '1px solid #f0f0f0' }}>¥{basePrice.toLocaleString()}</td></tr></tbody></table>
                 </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '32px' }}>
-                  <div style={{ width: '280px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#555' }}>
-                      <span>小計</span><span>¥{basePrice.toLocaleString()}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#555' }}>
-                      <span>消費税（10%）</span><span>¥{tax.toLocaleString()}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', fontSize: '18px', fontWeight: 'bold', color: '#1a1a2e', borderTop: '2px solid #1a1a2e', marginTop: '8px' }}>
-                      <span>合計</span><span>¥{total.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #a7f3d0', marginBottom: '32px' }}>
-                  <span style={{ fontSize: '20px' }}>✅</span>
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#059669' }}>お支払い済み</div>
-                    <div style={{ fontSize: '12px', color: '#10b981' }}>クレジットカードによる自動引き落とし</div>
-                  </div>
-                </div>
-
-                <div style={{ fontSize: '12px', color: '#999', lineHeight: '1.8', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>備考</div>
-                  <div>・本請求書は As-Works プレミアムプランの月額利用料に関するものです。</div>
-                  <div>・消費税は税率10%で計算しています。</div>
-                  <div>・サブスクリプションはいつでもキャンセル可能です。</div>
-                  <div>・ご不明な点がございましたらメッセージ機能よりお問い合わせください。</div>
-                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '32px' }}><div style={{ width: '280px' }}><div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#555' }}><span>小計</span><span>¥{basePrice.toLocaleString()}</span></div><div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#555' }}><span>消費税（10%）</span><span>¥{tax.toLocaleString()}</span></div><div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', fontSize: '18px', fontWeight: 'bold', color: '#1a1a2e', borderTop: '2px solid #1a1a2e', marginTop: '8px' }}><span>合計</span><span>¥{total.toLocaleString()}</span></div></div></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #a7f3d0', marginBottom: '32px' }}><span style={{ fontSize: '20px' }}>✅</span><div><div style={{ fontSize: '14px', fontWeight: 'bold', color: '#059669' }}>お支払い済み</div><div style={{ fontSize: '12px', color: '#10b981' }}>クレジットカードによる自動引き落とし</div></div></div>
+                <div style={{ fontSize: '12px', color: '#999', lineHeight: '1.8', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}><div style={{ fontWeight: 'bold', marginBottom: '4px' }}>備考</div><div>・本請求書は As-Works プレミアムプランの月額利用料に関するものです。</div><div>・消費税は税率10%で計算しています。</div><div>・サブスクリプションはいつでもキャンセル可能です。</div><div>・ご不明な点がございましたらメッセージ機能よりお問い合わせください。</div></div>
               </div>
-
               <div style={{ marginTop: '24px', background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }} data-no-print>
                 <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '16px' }}>📋 請求履歴</div>
-                {billingHistory.map((b, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e5e7eb', marginBottom: '8px' }}>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>{b.month}</div>
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{b.invoiceNo}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1a1a2e' }}>¥{b.amount.toLocaleString()}</div>
-                      <span style={{ fontSize: '11px', background: '#f0fdf4', color: '#059669', padding: '3px 10px', borderRadius: '20px', fontWeight: 'bold' }}>支払済</span>
-                    </div>
-                  </div>
-                ))}
+                {billingHistory.map((b, idx) => (<div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e5e7eb', marginBottom: '8px' }}><div><div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>{b.month}</div><div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{b.invoiceNo}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1a1a2e' }}>¥{b.amount.toLocaleString()}</div><span style={{ fontSize: '11px', background: '#f0fdf4', color: '#059669', padding: '3px 10px', borderRadius: '20px', fontWeight: 'bold' }}>支払済</span></div></div>))}
               </div>
             </div>
             );
@@ -1482,16 +1237,35 @@ export default function ReservationsPage() {
                         <div style={{ flex: 1, padding: '10px 14px', background: '#f8f9fa', borderRadius: '8px', border: '2px solid #e5e7eb', fontSize: '12px', color: '#333', wordBreak: 'break-all', fontFamily: 'monospace' }}>
                           {typeof window !== 'undefined' ? `${window.location.origin}/booking?owner=${userId}` : `/booking?owner=${userId}`}
                         </div>
-                        <button onClick={() => {
-                          const url = `${window.location.origin}/booking?owner=${userId}`;
-                          navigator.clipboard.writeText(url);
-                          setUrlCopied(true);
-                          setTimeout(() => setUrlCopied(false), 2000);
-                        }} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: urlCopied ? '#10b981' : '#6366f1', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        <button onClick={() => { const url = `${window.location.origin}/booking?owner=${userId}`; navigator.clipboard.writeText(url); setUrlCopied(true); setTimeout(() => setUrlCopied(false), 2000); }} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: urlCopied ? '#10b981' : '#6366f1', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>
                           {urlCopied ? '✓ コピー済み' : '📋 コピー'}
                         </button>
                       </div>
                       <div style={{ fontSize: '11px', color: '#999', marginTop: '6px' }}>このURLをLINEやSNSに貼り付けてお客様に共有できます</div>
+                    </div>
+
+                    {/* ★ 受付時間設定（追加） */}
+                    <div style={{ marginBottom: '24px', padding: '16px 20px', background: '#f0f0ff', borderRadius: '12px', border: '2px solid #c7d2fe' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#4f46e5', marginBottom: '12px' }}>🕐 受付時間</div>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '13px', color: '#555', fontWeight: 'bold' }}>開始</span>
+                          <select value={ownerStartHour} onChange={e => setOwnerStartHour(Number(e.target.value))} style={{ padding: '8px 12px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', background: 'white', cursor: 'pointer' }}>
+                            {Array.from({ length: 25 }, (_, i) => (<option key={i} value={i}>{i}:00</option>))}
+                          </select>
+                        </div>
+                        <span style={{ fontSize: '16px', color: '#999' }}>〜</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '13px', color: '#555', fontWeight: 'bold' }}>終了</span>
+                          <select value={ownerEndHour} onChange={e => setOwnerEndHour(Number(e.target.value))} style={{ padding: '8px 12px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', background: 'white', cursor: 'pointer' }}>
+                            {Array.from({ length: 25 }, (_, i) => (<option key={i} value={i}>{i}:00</option>))}
+                          </select>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#6366f1', fontWeight: 'bold', background: '#eef2ff', padding: '6px 12px', borderRadius: '8px' }}>
+                          現在: {ownerStartHour}:00 〜 {ownerEndHour}:00
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>予約ページとダッシュボードの時間枠に反映されます。下の「保存する」ボタンで保存してください。</div>
                     </div>
 
                     <div style={{ marginBottom: '20px' }}>
@@ -1512,20 +1286,14 @@ export default function ReservationsPage() {
                         {shopImageUrl ? (
                           <div style={{ position: 'relative' }}>
                             <img src={shopImageUrl} alt="店舗画像" style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '10px', border: '2px solid #e5e7eb' }} />
-                            <button onClick={async () => {
-                              setShopImageUrl('');
-                              await supabase.from('user_settings').upsert({ user_id: userId, shop_image_url: '', updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-                            }} style={{ position: 'absolute', top: '-6px', right: '-6px', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                            <button onClick={async () => { setShopImageUrl(''); await supabase.from('user_settings').upsert({ user_id: userId, shop_image_url: '', updated_at: new Date().toISOString() }, { onConflict: 'user_id' }); }} style={{ position: 'absolute', top: '-6px', right: '-6px', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                           </div>
-                        ) : (
-                          <div style={{ width: '120px', height: '80px', borderRadius: '10px', border: '2px dashed #d0d0d0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未設定</div>
-                        )}
+                        ) : (<div style={{ width: '120px', height: '80px', borderRadius: '10px', border: '2px dashed #d0d0d0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未設定</div>)}
                         <div style={{ flex: 1 }}>
                           <label style={{ display: 'inline-block', padding: '10px 16px', borderRadius: '8px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: imageUploading ? 'default' : 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
                             {imageUploading ? 'アップロード中...' : '📷 画像を選択'}
                             <input type="file" accept="image/*" style={{ display: 'none' }} disabled={imageUploading} onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
+                              const file = e.target.files?.[0]; if (!file) return;
                               setImageUploading(true);
                               const ext = file.name.split('.').pop();
                               const path = `${userId}/shop-image-${Date.now()}.${ext}`;
@@ -1545,58 +1313,25 @@ export default function ReservationsPage() {
                     <div style={{ marginBottom: '24px' }}>
                       <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🎨 背景カラー</div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {[
-                          { color: '#1a1a2e', label: 'ダーク' },
-                          { color: '#0f3460', label: 'ネイビー' },
-                          { color: '#1e40af', label: 'ブルー' },
-                          { color: '#065f46', label: 'グリーン' },
-                          { color: '#7c2d12', label: 'ブラウン' },
-                          { color: '#581c87', label: 'パープル' },
-                          { color: '#be123c', label: 'レッド' },
-                          { color: '#374151', label: 'グレー' },
-                        ].map(c => (
-                          <div key={c.color} onClick={() => setShopBgColor(c.color)} style={{ width: '44px', height: '44px', borderRadius: '10px', background: c.color, cursor: 'pointer', border: shopBgColor === c.color ? '3px solid #6366f1' : '2px solid #e5e7eb', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '2px', transition: 'transform 0.15s' }} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)'} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1)'}>
-                            {shopBgColor === c.color && <span style={{ color: 'white', fontSize: '14px' }}>✓</span>}
-                          </div>
+                        {[{ color: '#1a1a2e', label: 'ダーク' },{ color: '#0f3460', label: 'ネイビー' },{ color: '#1e40af', label: 'ブルー' },{ color: '#065f46', label: 'グリーン' },{ color: '#7c2d12', label: 'ブラウン' },{ color: '#581c87', label: 'パープル' },{ color: '#be123c', label: 'レッド' },{ color: '#374151', label: 'グレー' }].map(c => (
+                          <div key={c.color} onClick={() => setShopBgColor(c.color)} style={{ width: '44px', height: '44px', borderRadius: '10px', background: c.color, cursor: 'pointer', border: shopBgColor === c.color ? '3px solid #6366f1' : '2px solid #e5e7eb', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '2px', transition: 'transform 0.15s' }} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)'} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1)'}>{shopBgColor === c.color && <span style={{ color: 'white', fontSize: '14px' }}>✓</span>}</div>
                         ))}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px' }}>
-                          <input type="color" value={shopBgColor} onChange={e => setShopBgColor(e.target.value)} style={{ width: '44px', height: '44px', border: '2px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', padding: '2px' }} />
-                          <span style={{ fontSize: '12px', color: '#999' }}>自由選択</span>
-                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px' }}><input type="color" value={shopBgColor} onChange={e => setShopBgColor(e.target.value)} style={{ width: '44px', height: '44px', border: '2px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', padding: '2px' }} /><span style={{ fontSize: '12px', color: '#999' }}>自由選択</span></div>
                       </div>
                     </div>
 
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🔤 店舗名の文字サイズ: {shopNameSize}px</div>
-                      <input type="range" min="16" max="44" value={shopNameSize} onChange={e => setShopNameSize(Number(e.target.value))} style={{ width: '100%' }} />
-                    </div>
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🔤 説明文の文字サイズ: {shopDescSize}px</div>
-                      <input type="range" min="10" max="28" value={shopDescSize} onChange={e => setShopDescSize(Number(e.target.value))} style={{ width: '100%' }} />
-                    </div>
+                    <div style={{ marginBottom: '20px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🔤 店舗名の文字サイズ: {shopNameSize}px</div><input type="range" min="16" max="44" value={shopNameSize} onChange={e => setShopNameSize(Number(e.target.value))} style={{ width: '100%' }} /></div>
+                    <div style={{ marginBottom: '20px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🔤 説明文の文字サイズ: {shopDescSize}px</div><input type="range" min="10" max="28" value={shopDescSize} onChange={e => setShopDescSize(Number(e.target.value))} style={{ width: '100%' }} /></div>
 
-                    {shopImageUrl && (
-                      <>
-                        <div style={{ marginBottom: '20px' }}>
-                          <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📐 画像サイズ: {shopImageSize}px</div>
-                          <input type="range" min="40" max="300" value={shopImageSize} onChange={e => setShopImageSize(Number(e.target.value))} style={{ width: '100%' }} />
-                        </div>
-                        <div style={{ marginBottom: '24px' }}>
-                          <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📍 画像の位置: {shopImageX === 0 ? '左端' : shopImageX === 50 ? '中央' : shopImageX === 100 ? '右端' : `${shopImageX}%`}</div>
-                          <input type="range" min="0" max="100" value={shopImageX} onChange={e => setShopImageX(Number(e.target.value))} style={{ width: '100%' }} />
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#999', marginTop: '4px' }}><span>← 左</span><span>中央</span><span>右 →</span></div>
-                        </div>
-                      </>
-                    )}
+                    {shopImageUrl && (<>
+                      <div style={{ marginBottom: '20px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📐 画像サイズ: {shopImageSize}px</div><input type="range" min="40" max="300" value={shopImageSize} onChange={e => setShopImageSize(Number(e.target.value))} style={{ width: '100%' }} /></div>
+                      <div style={{ marginBottom: '24px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📍 画像の位置: {shopImageX === 0 ? '左端' : shopImageX === 50 ? '中央' : shopImageX === 100 ? '右端' : `${shopImageX}%`}</div><input type="range" min="0" max="100" value={shopImageX} onChange={e => setShopImageX(Number(e.target.value))} style={{ width: '100%' }} /><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#999', marginTop: '4px' }}><span>← 左</span><span>中央</span><span>右 →</span></div></div>
+                    </>)}
 
                     <div style={{ marginBottom: '24px' }}>
                       <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>👁 プレビュー</div>
                       <div style={{ background: `linear-gradient(135deg, ${shopBgColor} 0%, ${shopBgColor}dd 100%)`, borderRadius: '12px', padding: '24px', textAlign: 'center', color: 'white' }}>
-                        {shopImageUrl && (
-                          <div style={{ display: 'flex', marginBottom: '10px' }}>
-                            <img src={shopImageUrl} alt="" style={{ width: `${shopImageSize}px`, objectFit: 'contain', borderRadius: '8px', marginLeft: `${shopImageX}%`, transform: `translateX(-${shopImageX}%)` }} />
-                          </div>
-                        )}
+                        {shopImageUrl && (<div style={{ display: 'flex', marginBottom: '10px' }}><img src={shopImageUrl} alt="" style={{ width: `${shopImageSize}px`, objectFit: 'contain', borderRadius: '8px', marginLeft: `${shopImageX}%`, transform: `translateX(-${shopImageX}%)` }} /></div>)}
                         <div style={{ fontSize: `${shopNameSize}px`, fontWeight: 'bold', letterSpacing: '2px', whiteSpace: 'pre-line' }}>{shopName || '（店舗名未設定）'}</div>
                         <div style={{ fontSize: `${shopDescSize}px`, opacity: 0.7, marginTop: '6px', whiteSpace: 'pre-line' }}>{shopDescription || 'オンライン予約'}</div>
                       </div>
@@ -1609,8 +1344,14 @@ export default function ReservationsPage() {
                         shop_bg_color: shopBgColor, shop_image_url: shopImageUrl,
                         shop_name_size: shopNameSize, shop_desc_size: shopDescSize,
                         shop_image_size: shopImageSize, shop_image_x: shopImageX,
+                        start_hour: ownerStartHour, end_hour: ownerEndHour,
                         updated_at: new Date().toISOString(),
                       }, { onConflict: 'user_id' });
+                      // localStorage同期（ダッシュボードと連携）
+                      try {
+                        localStorage.setItem('startHour', String(ownerStartHour));
+                        localStorage.setItem('endHour', String(ownerEndHour));
+                      } catch (e) {}
                       setShopSaving(false);
                       alert('保存しました！予約ページに反映されます。');
                     }} disabled={shopSaving} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: shopSaving ? '#ccc' : 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: shopSaving ? 'default' : 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
@@ -1622,14 +1363,10 @@ export default function ReservationsPage() {
           )}
 
           {/* 顧客登録 */}
-          {activeMenu === 'register' && !searchQuery && (
-            <iframe src="/customer-register" style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />
-          )}
+          {activeMenu === 'register' && !searchQuery && (<iframe src="/customer-register" style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />)}
 
           {/* 顧客台帳 */}
-          {activeMenu === 'customers' && !searchQuery && (
-            <iframe src="/customers" style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />
-          )}
+          {activeMenu === 'customers' && !searchQuery && (<iframe src="/customers" style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />)}
 
           {/* 準備中 */}
           {!searchQuery && !['reservations', 'stats', 'actions', 'message', 'billing', 'settings', 'inspection', 'shifts', 'register', 'customers'].includes(activeMenu) && (
