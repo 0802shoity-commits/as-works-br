@@ -14,6 +14,7 @@ export default function UpgradeModal({ open, onClose, userId }: Props) {
   const [loading, setLoading] = useState(false);
   const [paypalReady, setPaypalReady] = useState(false);
   const [paypalError, setPaypalError] = useState(false);
+  const [paypalRedirectLoading, setPaypalRedirectLoading] = useState(false);
   const paypalBtnRef = useRef<HTMLDivElement>(null);
   const paypalRendered = useRef(false);
   const supabase = createClient();
@@ -26,6 +27,7 @@ export default function UpgradeModal({ open, onClose, userId }: Props) {
     setSelectedMethod(null);
     setPaypalReady(false);
     setPaypalError(false);
+    setPaypalRedirectLoading(false);
     paypalRendered.current = false;
     onClose();
   };
@@ -113,6 +115,22 @@ export default function UpgradeModal({ open, onClose, userId }: Props) {
     setLoading(false);
   };
 
+  // PayPalサーバーサイドチェックアウト（広告ブロッカー回避用）
+  const handlePayPalCheckout = async () => {
+    setPaypalRedirectLoading(true);
+    try {
+      const res = await fetch('/api/paypal-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (data.url) { window.location.href = data.url; }
+      else { alert('PayPalチェックアウトの作成に失敗しました: ' + (data.error || '')); }
+    } catch (e) { alert('エラーが発生しました'); }
+    setPaypalRedirectLoading(false);
+  };
+
   if (!open) return null;
 
   const radioStyle = (active: boolean, color: string) => ({
@@ -164,7 +182,6 @@ export default function UpgradeModal({ open, onClose, userId }: Props) {
                   ✓ 顧客台帳<br />
                   ✓ WEB予約受付<br />
                   ✓ 詳細項目カスタマイズ
-                  
                 </div>
                 <div style={{ marginTop: '16px', padding: '10px', borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', color: 'white' }}>このプランを選ぶ →</div>
               </div>
@@ -186,8 +203,8 @@ export default function UpgradeModal({ open, onClose, userId }: Props) {
               {/* クレジットカード */}
               <div onClick={() => setSelectedMethod('card')} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderRadius: '12px', border: `2px solid ${selectedMethod === 'card' ? '#6366f1' : '#e2e8f0'}`, background: selectedMethod === 'card' ? '#eef2ff' : 'white', cursor: 'pointer', transition: 'all 0.15s' }}>
                 <div style={{ width: '80px', height: '28px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-  <img src="/crejitto.png" alt="クレジットカード" style={{ width: '100px', objectFit: 'contain' }} />
-</div>
+                  <img src="/crejitto.png" alt="クレジットカード" style={{ width: '100px', objectFit: 'contain' }} />
+                </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>クレジットカード</div>
                   <div style={{ fontSize: '11px', color: '#94a3b8' }}>Visa / Mastercard / JCB / AMEX</div>
@@ -209,10 +226,10 @@ export default function UpgradeModal({ open, onClose, userId }: Props) {
             {selectedMethod === 'paypal' && (
               <div style={{ marginBottom: '16px' }}>
                 {paypalError ? (
-                  <div style={{ textAlign: 'center', padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
-                    <div style={{ fontSize: '13px', color: '#dc2626', marginBottom: '8px' }}>PayPalの読み込みに失敗しました</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>ブラウザの広告ブロッカーを無効にするか、別のブラウザでお試しください</div>
-                  </div>
+                  // SDK読み込み失敗時 → サーバー経由でPayPalにリダイレクト
+                  <button onClick={handlePayPalCheckout} disabled={paypalRedirectLoading} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: paypalRedirectLoading ? '#cbd5e1' : 'linear-gradient(135deg, #0070ba, #003087)', color: 'white', cursor: paypalRedirectLoading ? 'default' : 'pointer', fontWeight: 'bold', fontSize: '15px', boxShadow: paypalRedirectLoading ? 'none' : '0 4px 12px rgba(0,112,186,0.3)' }}>
+                    {paypalRedirectLoading ? '処理中...' : '🅿 PayPalで申し込む'}
+                  </button>
                 ) : !paypalReady ? (
                   <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', fontSize: '13px' }}>
                     <div style={{ marginBottom: '8px' }}>PayPalを読み込み中...</div>
