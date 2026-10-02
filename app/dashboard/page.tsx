@@ -136,7 +136,7 @@ const [userEmail, setUserEmail] = useState('');
   const lottieWebRef = useRef<any>(null); 
 
   const SIDE_WIDTH = 150;
-  const ROW_HEIGHT = settings.isCompact ? 45 : 80;
+  const [timelineHeight, setTimelineHeight] = useState(0);
   const totalHours = useMemo(() => Math.max(1, settings.endHour - settings.startHour + 1), [settings.startHour, settings.endHour]);
  const [COLUMN_WIDTH, setColumnWidth] = useState(100);
 
@@ -152,6 +152,14 @@ const [userEmail, setUserEmail] = useState('');
     const extraStaff = [...new Set(unassigned.map(a => a.staff))].filter(s => !slotRows.includes(s));
     return [...attending, ...slotRows, ...extraStaff];
   }, [attendance, selectedDate, appointments, bookingSlots]);
+
+  // 出勤人数に合わせて、全員が画面に収まる行の高さを計算
+  const ROW_HEIGHT = useMemo(() => {
+    const max = settings.isCompact ? 45 : 80;
+    const min = settings.isCompact ? 32 : 50;
+    if (!timelineHeight || staffList.length === 0) return max;
+    return Math.max(min, Math.min(max, Math.floor(timelineHeight / staffList.length)));
+  }, [timelineHeight, staffList.length, settings.isCompact]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -296,6 +304,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
     let isPrinting = false;
     const calcWidth = () => {
       if (isPrinting) return;
+      if (scrollRef.current) setTimelineHeight(scrollRef.current.clientHeight);
       const available = scrollRef.current?.clientWidth ?? (window.innerWidth - 80);
       setColumnWidth(Math.max(40, ((available - SIDE_WIDTH - 1) / totalHours) * settings.columnWidthScale));
     };
@@ -1034,7 +1043,7 @@ return (
             </div>
           </div>
         </div>
-        <div data-no-print style={{ display: "flex", justifyContent: "center", padding: "10px" }}>
+        <div data-no-print style={{ position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)", zIndex: 500, pointerEvents: "none" }}>
           <div ref={trashRef} style={{ width: "500px", height: "60px", border: `3px dashed ${isOverTrash ? "#f44336" : "#d0d0d0"}`, background: isOverTrash ? "#ffebee" : "#fff", borderRadius: "25px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", opacity: (activeAction || draggingNewType || draggingCategoryItem) ? 1 : 0, transition: "0.2s" }}><span>{isOverTrash ? "🔥" : "🗑️"}</span><span style={{ fontSize: "12px", fontWeight: "bold", color: isOverTrash ? "#f44336" : "#999" }}>ここにドラッグして削除</span></div>
         </div>
       </div>
