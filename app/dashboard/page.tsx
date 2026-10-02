@@ -3,6 +3,7 @@ import Lottie from "lottie-react";
 import contactAnim from "../../public/contact-anim.json";
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { flushSync } from "react-dom";
 import { createClient } from '../lib/supabase';
 import { BUSINESS_TYPES } from '../lib/businessTypes';
 import UpgradeModal from "../components/UpgradeModal";
@@ -290,12 +291,30 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
   }, [userId]);
 
   useEffect(() => {
+    let isPrinting = false;
     const calcWidth = () => {
-      setColumnWidth(Math.max(40, ((window.innerWidth - 80 - SIDE_WIDTH) / totalHours) * settings.columnWidthScale));
+      if (isPrinting) return;
+      const available = scrollRef.current?.clientWidth ?? (window.innerWidth - 80);
+      setColumnWidth(Math.max(40, ((available - SIDE_WIDTH - 1) / totalHours) * settings.columnWidthScale));
     };
+    const beforePrint = () => {
+      isPrinting = true;
+      // A4横の印刷幅に全時間帯が収まるように列幅を調整
+      flushSync(() => setColumnWidth((1040 - SIDE_WIDTH) / totalHours));
+    };
+    const afterPrint = () => { isPrinting = false; calcWidth(); };
     calcWidth();
+    const ro = new ResizeObserver(calcWidth);
+    if (scrollRef.current) ro.observe(scrollRef.current);
     window.addEventListener('resize', calcWidth);
-    return () => window.removeEventListener('resize', calcWidth);
+    window.addEventListener('beforeprint', beforePrint);
+    window.addEventListener('afterprint', afterPrint);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', calcWidth);
+      window.removeEventListener('beforeprint', beforePrint);
+      window.removeEventListener('afterprint', afterPrint);
+    };
   }, [totalHours, settings.columnWidthScale]);
 
   useEffect(() => {
@@ -644,15 +663,25 @@ const subIconImgStyle = {
 };
 
 return (
-  <div style={{ height: "100vh", background: "#f8f9fa", display: "flex", flexDirection: "column", overflow: "hidden", userSelect: "none" }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+  <div style={{ height: "100vh", background: "#f8f9fa", display: "flex", flexDirection: "column", overflow: "hidden", userSelect: "none" }} className="dash-root" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap');
+      @media print {
+        @page { size: A4 landscape; margin: 8mm; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        html, body { height: auto !important; overflow: visible !important; background: white !important; }
+        .dash-root { height: auto !important; overflow: visible !important; background: white !important; }
+        [data-no-print] { display: none !important; }
+        [data-print-timeline] { margin: 0 !important; flex: none !important; overflow: visible !important; }
+        [data-print-timeline] > div { flex: none !important; overflow: visible !important; box-shadow: none !important; }
+        [data-print-scroll] { overflow: visible !important; flex: none !important; height: auto !important; }
+      }
       @keyframes notifMarquee {
         0% { transform: translateX(0%); }
         100% { transform: translateX(-50%); }
       }
     `}</style>
-    <div style={{ background: "white", padding: "8px 30px", borderBottom: "2px solid #e0e0e0", display: "flex", alignItems: "center", gap: "50px", zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
+    <div data-no-print style={{ background: "white", padding: "8px 30px", borderBottom: "2px solid #e0e0e0", display: "flex", alignItems: "center", gap: "50px", zIndex: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0px", fontSize: "24px", color: "#000000", letterSpacing: "1px", fontFamily: "Arial, sans-serif", fontWeight: "bold", minWidth: "140px", whiteSpace: "nowrap" }}>
   <img src="/awwork.png" alt="As-Works logo" style={{ width: "60px", height: "60px", objectFit: "contain", mixBlendMode: "multiply", marginRight: "-6px" }} />
         -Works
@@ -859,7 +888,7 @@ return (
 
       {isModalOpen && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "480px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>予約不可設定</span><span onClick={() => setIsModalOpen(false)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "4px", marginBottom: "20px" }}><div onClick={() => setBlockForm({ ...blockForm, mode: "range" })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: blockForm.mode === "range" ? "white" : "transparent", fontWeight: blockForm.mode === "range" ? "bold" : "normal" }}>期間で指定</div><div onClick={() => setBlockForm({ ...blockForm, mode: "multiple" })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: blockForm.mode === "multiple" ? "white" : "transparent", fontWeight: blockForm.mode === "multiple" ? "bold" : "normal" }}>とびとびで指定</div></div><div style={{ marginBottom: "20px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>日程を選択</div>{blockForm.mode === "range" ? (<div style={{ display: "flex", alignItems: "center", gap: "10px" }}><input type="date" value={blockForm.startDate} onChange={e => setBlockForm({ ...blockForm, startDate: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} /><span>〜</span><input type="date" value={blockForm.endDate} onChange={e => setBlockForm({ ...blockForm, endDate: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} /></div>) : (<div><input type="date" onChange={e => { if (e.target.value && !blockForm.specificDates.includes(e.target.value)) setBlockForm({ ...blockForm, specificDates: [...blockForm.specificDates, e.target.value] }); }} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0", marginBottom: "10px" }} /><div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{blockForm.specificDates.map(d => (<div key={d} style={{ background: "#f3e8ff", color: "#7d2ae8", padding: "4px 10px", borderRadius: "15px", fontSize: "11px", display: "flex", alignItems: "center", gap: "5px" }}>{d} <span onClick={() => setBlockForm({ ...blockForm, specificDates: blockForm.specificDates.filter(date => date !== d) })} style={{ cursor: "pointer" }}>×</span></div>))}</div></div>)}</div><div style={{ marginBottom: "20px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>時間帯を選択</div><div style={{ display: "flex", alignItems: "center", gap: "10px" }}><input type="time" value={blockForm.startTime} onChange={e => setBlockForm({ ...blockForm, startTime: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} /><span>〜</span><input type="time" value={blockForm.endTime} onChange={e => setBlockForm({ ...blockForm, endTime: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} /></div></div>{blockForm.mode === "range" && (<div style={{ marginBottom: "25px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>特定の曜日のみ (任意)</div><div style={{ display: "flex", gap: "5px" }}>{DAYS_OF_WEEK.map((day, idx) => (<div key={day} onClick={() => { const newDays = blockForm.selectedDays.includes(idx) ? blockForm.selectedDays.filter(d => d !== idx) : [...blockForm.selectedDays, idx]; setBlockForm({ ...blockForm, selectedDays: newDays }); }} style={{ flex: 1, height: "35px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", cursor: "pointer", fontSize: "12px", background: blockForm.selectedDays.includes(idx) ? "#7d2ae8" : "#f0f0f0", color: blockForm.selectedDays.includes(idx) ? "white" : "#333", border: blockForm.selectedDays.includes(idx) ? "2px solid #7d2ae8" : "2px solid #d0d0d0" }}>{day}</div>))}</div></div>)}<div style={{ display: "flex", gap: "10px" }}><button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>キャンセル</button><button onClick={saveBlockSetting} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>設定を保存</button></div></div></div>)}
 
-      <div style={{ margin: "15px 20px", background: "white", borderRadius: "12px", padding: "15px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", display: "flex", gap: "20px", height: "240px", border: "2px solid #e8e8e8" }}>
+      <div data-no-print style={{ margin: "15px 20px", background: "white", borderRadius: "12px", padding: "15px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", display: "flex", gap: "20px", height: "240px", border: "2px solid #e8e8e8" }}>
         <div style={{ flex: 1, display: "flex", gap: "10px", borderRight: "3px solid #d0d0d0", paddingRight: "15px", alignItems: "center", justifyContent: "center", height: "100%" }}>
           <button onClick={() => changeMonth(-1)} style={{ background: "none", border: "2px solid #d0d0d0", borderRadius: "4px", padding: "5px", flexShrink: 0 }}>◀</button>
           <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -927,7 +956,7 @@ return (
 
       {editingCategory && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "420px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>カテゴリー編集</span><span onClick={() => setEditingCategory(null)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>カテゴリー名</div><input type="text" value={editCategoryForm.name} onChange={e => setEditCategoryForm({ ...editCategoryForm, name: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>色を選択</div><div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>背景色</div><input type="color" value={editCategoryForm.bgColor} onChange={e => setEditCategoryForm({ ...editCategoryForm, bgColor: e.target.value })} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>枠線色</div><input type="color" value={editCategoryForm.borderColor} onChange={e => setEditCategoryForm({ ...editCategoryForm, borderColor: e.target.value })} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}><div style={{ width: "100%", height: "40px", background: editCategoryForm.bgColor, border: `3px solid ${editCategoryForm.borderColor}`, borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "bold" }}>プレビュー</div></div></div><div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>{COLOR_PALETTE.map((color, idx) => (<div key={idx} onClick={() => setEditCategoryForm({ ...editCategoryForm, bgColor: color.bg, borderColor: color.border })} style={{ width: "100%", height: "50px", background: color.bg, border: editCategoryForm.bgColor === color.bg ? `4px solid ${color.border}` : `2px solid ${color.border}`, borderRadius: "6px", cursor: "pointer" }} />))}</div></div><div style={{ display: "flex", gap: "10px", marginTop: "20px" }}><button onClick={() => setEditingCategory(null)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>キャンセル</button><button onClick={() => { if (window.confirm(`「${editingCategory}」を削除しますか？`)) { setWorkCategories(prev => prev.filter(cat => cat.category !== editingCategory)); setEditingCategory(null); } }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #ff5252", background: "white", color: "#ff5252", cursor: "pointer", fontWeight: "bold" }}>削除</button><button onClick={() => { if (!editCategoryForm.name.trim()) { alert("カテゴリー名を入力してください"); return; } setWorkCategories(prev => prev.map(cat => cat.category === editingCategory ? { ...cat, category: editCategoryForm.name.trim(), color: editCategoryForm.bgColor, borderColor: editCategoryForm.borderColor } : cat)); setEditingCategory(null); }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>保存</button></div></div></div>)}
 
-      <div style={{ flex: 1, margin: "0 20px 10px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div data-print-timeline style={{ flex: 1, margin: "0 20px 10px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ flex: 1, background: "#ecf3f9", borderRadius: "12px", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", border: "2px solid #e8e8e8" }}>
           <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", padding: "12px 20px", fontSize: "13px", fontWeight: "bold" }}>📅 {selectedDate} の予約状況　（出勤: {staffList.length}名）</div>
           <div ref={headerScrollRef} style={{ display: "flex", background: "#fcfcfc", borderBottom: "3px solid #d0d0d0", zIndex: 10, overflowX: "hidden" }}>
@@ -988,7 +1017,7 @@ return (
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "center", padding: "10px" }}>
+        <div data-no-print style={{ display: "flex", justifyContent: "center", padding: "10px" }}>
           <div ref={trashRef} style={{ width: "500px", height: "60px", border: `3px dashed ${isOverTrash ? "#f44336" : "#d0d0d0"}`, background: isOverTrash ? "#ffebee" : "#fff", borderRadius: "25px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", opacity: (activeAction || draggingNewType || draggingCategoryItem) ? 1 : 0, transition: "0.2s" }}><span>{isOverTrash ? "🔥" : "🗑️"}</span><span style={{ fontSize: "12px", fontWeight: "bold", color: isOverTrash ? "#f44336" : "#999" }}>ここにドラッグして削除</span></div>
         </div>
       </div>
