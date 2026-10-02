@@ -527,8 +527,8 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
     const relativeX = clientX - rect.left + scrollRef.current.scrollLeft - SIDE_WIDTH;
     const rawMins = settings.startHour * 60 + (relativeX / COLUMN_WIDTH) * 60;
     const mins = Math.round(rawMins / settings.timeStep) * settings.timeStep;
-    return Math.max(settings.startHour * 60, Math.min(settings.endHour * 60, mins));
-  }, [settings, COLUMN_WIDTH]);
+    return Math.max(settings.startHour * 60, Math.min((settings.startHour + totalHours) * 60, mins));
+  }, [settings, COLUMN_WIDTH, totalHours]);
 
   const getStaffFromY = (clientY: number) => {
     if (!scrollRef.current) return "";
@@ -540,7 +540,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePos({ x: e.clientX, y: e.clientY });
-    if (resizingAppId !== null) { setAppointments(prev => prev.map(app => app.id === resizingAppId ? { ...app, end: Math.max(settings.startHour * 60 + settings.timeStep, getTimeFromX(e.clientX)) } : app)); return; }
+    if (resizingAppId !== null) { setAppointments(prev => prev.map(app => app.id === resizingAppId ? { ...app, end: Math.max(app.start + settings.timeStep, getTimeFromX(e.clientX)) } : app)); return; }
     if (!activeAction) return;
     if (!isDragStarted) { const distance = Math.sqrt(Math.pow(e.clientX - (activeAction.startX || e.clientX), 2) + Math.pow(e.clientY - (activeAction.startY || e.clientY), 2)); if (distance < 5) return; setIsDragStarted(true); }
     setAppointments(prev => prev.map(app => {
@@ -556,7 +556,19 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
   };
 
   const handleMouseUp = async () => {
-    setPressedType(null); setResizingAppId(null);
+    setPressedType(null);
+    // リサイズ終了 → 終了時刻を保存
+    if (resizingAppId !== null) {
+      const resized = appointments.find(a => a.id === resizingAppId);
+      setResizingAppId(null);
+      if (resized && userId) await supabase.from('appointments').update({ end_time: resized.end }).eq('id', resized.id);
+      return;
+    }
+    // 移動終了 → 開始・終了時刻とスタッフを保存
+    if (activeAction?.type === "move" && isDragStarted && !isOverTrash && userId) {
+      const moved = appointments.find(a => a.id === activeAction.id);
+      if (moved) await supabase.from('appointments').update({ start_time: moved.start, end_time: moved.end, staff: moved.staff }).eq('id', moved.id);
+    }
     if (isOverTrash) {
       if (activeAction && userId) { await supabase.from('appointments').delete().eq('id', activeAction.id); setAppointments(prev => prev.filter(app => app.id !== activeAction.id)); }
       if (draggingCategoryItem) { if (window.confirm(`「${draggingCategoryItem.itemTitle}」を削除しますか？`)) { setWorkCategories(prev => prev.map(cat => cat.category === draggingCategoryItem.categoryName ? { ...cat, items: cat.items.filter(item => item.title !== draggingCategoryItem.itemTitle) } : cat)); } }
