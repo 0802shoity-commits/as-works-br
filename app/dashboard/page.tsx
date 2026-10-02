@@ -695,6 +695,8 @@ return (
         [data-print-timeline] > div { flex: none !important; overflow: visible !important; box-shadow: none !important; }
         [data-print-scroll] { overflow: visible !important; flex: none !important; height: auto !important; }
       }
+      @keyframes catOpen { from { opacity: 0; transform: scale(0.96) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+      @keyframes catItemIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes notifMarquee {
         0% { transform: translateX(0%); }
         100% { transform: translateX(-50%); }
@@ -926,24 +928,26 @@ return (
           <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", fontWeight: "bold", textAlign: "center" }}>📅 本日の予約: {filteredAppointments.filter(a => staffList.includes(a.staff) && a.title !== "ブロック").length}件</div>
         </div>
 
-               <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", minWidth: 0 }}>
+                       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", minWidth: 0 }}>
           {(() => {
             const openCat = workCategories.find(c => c.category === expandedCategory);
-            const tileBase = { position: "relative" as const, aspectRatio: "1 / 1", borderRadius: "10px", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", padding: "6px", textAlign: "center" as const, boxSizing: "border-box" as const, transition: "transform 0.15s" };
-            const hoverOn = (e: React.MouseEvent) => { (e.currentTarget as HTMLElement).style.transform = "scale(1.05)"; };
-            const hoverOff = (e: React.MouseEvent) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; };
+            const tileBase = { position: "relative" as const, aspectRatio: "1 / 1", borderRadius: "10px", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", padding: "6px", textAlign: "center" as const, boxSizing: "border-box" as const, transition: "transform 0.2s ease, box-shadow 0.2s ease" };
+            const hoverOn = (e: React.MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.transform = "translateY(-3px) scale(1.03)"; el.style.boxShadow = "0 8px 16px rgba(0,0,0,0.12)"; };
+            const hoverOff = (e: React.MouseEvent) => { const el = e.currentTarget as HTMLElement; el.style.transform = "none"; el.style.boxShadow = "none"; };
+            const viewStyle = { display: "flex", flexDirection: "column" as const, flex: 1, minHeight: 0, animation: "catOpen 0.4s cubic-bezier(0.22, 1, 0.36, 1)" };
+            const itemAnim = (idx: number) => ({ animation: `catItemIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) ${idx * 0.04}s both` });
 
             // カテゴリー一覧（正方形タイル）
             if (!openCat) {
               return (
-                <>
-                  <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "8px", color: "#333" }}>
+                <div key="cat-list" style={viewStyle}>
+                  <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "4px", color: "#333" }}>
                     ドラッグして追加 <span style={{ fontWeight: "normal", color: "#999", fontSize: "11px" }}>（タップで開く）</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px", alignContent: "start", flex: 1, overflowY: "auto" }}>
-                    {workCategories.map(category => (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px", alignContent: "start", flex: 1, overflowY: "auto", padding: "6px" }}>
+                    {workCategories.map((category, idx) => (
                       <div key={category.category} onClick={() => setExpandedCategory(category.category)} onMouseEnter={hoverOn} onMouseLeave={hoverOff}
-                        style={{ ...tileBase, background: category.color, border: `3px solid ${category.borderColor}`, cursor: "pointer" }}>
+                        style={{ ...tileBase, ...itemAnim(idx), background: category.color, border: `3px solid ${category.borderColor}`, cursor: "pointer" }}>
                         <div style={{ fontWeight: "bold", fontSize: "12px", lineHeight: 1.3, wordBreak: "break-all", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{category.category}</div>
                         <div style={{ fontSize: "10px", color: "#555", marginTop: "4px" }}>{category.items.length}項目</div>
                         <div onClick={(e) => { e.stopPropagation(); setEditingCategory(category.category); setEditCategoryForm({ name: category.category, bgColor: category.color, borderColor: category.borderColor }); }}
@@ -956,7 +960,7 @@ return (
                       onMouseDown={() => { setDraggingNewType("ブロック"); setDraggingCategoryItem({ categoryName: "ブロック", itemTitle: "ブロック" }); setPressedType("ブロック"); }}
                       onMouseUp={() => { setDraggingNewType(null); setDraggingCategoryItem(null); }}
                       onMouseEnter={hoverOn} onMouseLeave={hoverOff}
-                      style={{ ...tileBase, background: "#d1d5db", border: "3px solid #6b7280", cursor: "grab", color: "#333" }}>
+                      style={{ ...tileBase, ...itemAnim(workCategories.length), background: "#d1d5db", border: "3px solid #6b7280", cursor: "grab", color: "#333" }}>
                       <div style={{ fontSize: "18px" }}>🚫</div>
                       <div style={{ fontWeight: "bold", fontSize: "12px", marginTop: "2px" }}>ブロック</div>
                       <div style={{ fontSize: "9px", color: "#555" }}>ドラッグ</div>
@@ -964,18 +968,18 @@ return (
 
                     {/* カテゴリー追加 */}
                     <div onClick={addWorkType} onMouseEnter={hoverOn} onMouseLeave={hoverOff}
-                      style={{ ...tileBase, background: "white", border: "3px dashed #c0c0c0", cursor: "pointer", color: "#888" }}>
+                      style={{ ...tileBase, ...itemAnim(workCategories.length + 1), background: "white", border: "3px dashed #c0c0c0", cursor: "pointer", color: "#888" }}>
                       <div style={{ fontSize: "22px", lineHeight: 1 }}>＋</div>
                       <div style={{ fontWeight: "bold", fontSize: "11px", marginTop: "4px" }}>追加</div>
                     </div>
                   </div>
-                </>
+                </div>
               );
             }
 
             // カテゴリーを開いた状態（ここだけスクロール可）
             return (
-              <>
+              <div key={`cat-${openCat.category}`} style={viewStyle}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                   <button onClick={() => setExpandedCategory(null)} style={{ padding: "4px 10px", borderRadius: "6px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>← 戻る</button>
                   <div style={{ flex: 1, padding: "4px 10px", borderRadius: "6px", background: openCat.color, border: `2px solid ${openCat.borderColor}`, fontWeight: "bold", fontSize: "13px", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openCat.category}</div>
@@ -983,8 +987,8 @@ return (
                     style={{ width: "26px", height: "26px", borderRadius: "50%", background: openCat.borderColor, color: "white", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>✎</div>
                 </div>
                 <div style={{ flex: 1, overflowY: "auto", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", alignContent: "start", background: "#f9f9f9", border: `2px solid ${openCat.borderColor}`, borderRadius: "8px", padding: "8px" }}>
-                  {openCat.items.map((item) => (
-                    <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                  {openCat.items.map((item, idx) => (
+                    <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: "3px", ...itemAnim(idx) }}>
                       <div
                         onMouseDown={() => { setDraggingNewType(item.title); setDraggingCategoryItem({ categoryName: openCat.category, itemTitle: item.title }); setPressedType(item.title); }}
                         onMouseUp={() => { setDraggingNewType(null); setDraggingCategoryItem(null); }}
@@ -997,11 +1001,11 @@ return (
                   ))}
                   <div
                     onClick={() => { setIsAddItemModalOpen(true); setAddItemForm({ mode: "existing", categoryName: openCat.category, itemName: "", duration: 60, bgColor: openCat.color, borderColor: openCat.borderColor }); setTempBgColor(openCat.color); setTempBorderColor(openCat.borderColor); }}
-                    style={{ background: "white", border: `2px dashed ${openCat.borderColor}`, borderRadius: "6px", padding: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", textAlign: "center", minHeight: "34px", display: "flex", alignItems: "center", justifyContent: "center", color: openCat.borderColor }}>
+                    style={{ background: "white", border: `2px dashed ${openCat.borderColor}`, borderRadius: "6px", padding: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", textAlign: "center", minHeight: "34px", display: "flex", alignItems: "center", justifyContent: "center", color: openCat.borderColor, ...itemAnim(openCat.items.length) }}>
                     ＋ 項目追加
                   </div>
                 </div>
-              </>
+              </div>
             );
           })()}
           {draggingCategoryItem && (() => { const ghostColor = getGhostColor(); return (<div style={{ position: "fixed", left: mousePos.x - 40, top: mousePos.y - 20, pointerEvents: "none", zIndex: 9999 }}><div style={{ background: ghostColor.bg, border: `2px solid ${ghostColor.border}`, borderRadius: "6px", padding: "8px 12px", fontWeight: "bold", fontSize: "11px", whiteSpace: "nowrap", backdropFilter: "blur(4px)" }}>{draggingCategoryItem.itemTitle}</div></div>); })()}
