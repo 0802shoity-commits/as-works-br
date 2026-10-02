@@ -1016,8 +1016,12 @@ return (
 
       <div data-print-timeline style={{ flex: 1, margin: "0 20px 10px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ flex: 1, background: "#ecf3f9", borderRadius: "12px", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", border: "2px solid #e8e8e8" }}>
-          <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", padding: "12px 20px", fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", padding: "12px 20px", fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
   <span>📅 {selectedDate} の予約状況　（出勤: {staffList.length}名）</span>
+  <div ref={trashRef} data-no-print style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "320px", height: "34px", borderRadius: "17px", border: `2px dashed ${isOverTrash ? "#fca5a5" : "rgba(255,255,255,0.5)"}`, background: isOverTrash ? "rgba(239,68,68,0.85)" : "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: (activeAction && isDragStarted) || draggingNewType || draggingCategoryItem ? 1 : 0, transition: "0.2s", pointerEvents: "none", color: "white", fontSize: "12px", fontWeight: "bold" }}>
+    <span>{isOverTrash ? "🔥" : "🗑️"}</span>
+    <span>{isOverTrash ? "離すと削除" : "ここにドラッグして削除"}</span>
+  </div>
   <div data-no-print style={{ display: "flex", gap: "8px" }}>
     {(['A4', 'A3'] as const).map(p => (
       <button key={p} onClick={() => printTimeline(p)} style={{ padding: "4px 12px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.1)", color: "white", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}>🖨 {p}で印刷</button>
@@ -1082,9 +1086,7 @@ return (
             </div>
           </div>
         </div>
-        <div data-no-print style={{ position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)", zIndex: 500, pointerEvents: "none" }}>
-          <div ref={trashRef} style={{ width: "500px", height: "60px", border: `3px dashed ${isOverTrash ? "#f44336" : "#d0d0d0"}`, background: isOverTrash ? "#ffebee" : "#fff", borderRadius: "25px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", opacity: (activeAction || draggingNewType || draggingCategoryItem) ? 1 : 0, transition: "0.2s" }}><span>{isOverTrash ? "🔥" : "🗑️"}</span><span style={{ fontSize: "12px", fontWeight: "bold", color: isOverTrash ? "#f44336" : "#999" }}>ここにドラッグして削除</span></div>
-        </div>
+        
       </div>
 
       {showFeaturePreview && (
