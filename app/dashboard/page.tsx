@@ -124,6 +124,8 @@ const [userEmail, setUserEmail] = useState('');
   const [showBookings, setShowBookings] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showFeaturePreview, setShowFeaturePreview] = useState(false);
+  const [printPaper, setPrintPaper] = useState<'A4' | 'A3'>('A4');
+  const printWidthRef = useRef(1040);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const trashRef = useRef<HTMLDivElement>(null);
@@ -519,6 +521,14 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
     setWorkCategories(prev => prev.map(cat => cat.category === categoryName ? { ...cat, items: cat.items.map(item => item.title === itemTitle ? { ...item, color: randomColor.bg, borderColor: randomColor.border } : item) } : cat));
   };
 
+  const printTimeline = (paper: 'A4' | 'A3') => {
+    printWidthRef.current = paper === 'A3' ? 1500 : 1040;
+    flushSync(() => setPrintPaper(paper));
+    window.print();
+    printWidthRef.current = 1040;
+    setPrintPaper('A4');
+  };
+
   const formatTime = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 
   const openAppointmentDetail = (app: any) => {
@@ -667,7 +677,7 @@ return (
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap');
       @media print {
-        @page { size: A4 landscape; margin: 8mm; }
+        @page { size: ${printPaper} landscape; margin: 8mm; }
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         html, body { height: auto !important; overflow: visible !important; background: white !important; }
         .dash-root { height: auto !important; overflow: visible !important; background: white !important; }
@@ -958,7 +968,14 @@ return (
 
       <div data-print-timeline style={{ flex: 1, margin: "0 20px 10px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ flex: 1, background: "#ecf3f9", borderRadius: "12px", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", border: "2px solid #e8e8e8" }}>
-          <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", padding: "12px 20px", fontSize: "13px", fontWeight: "bold" }}>📅 {selectedDate} の予約状況　（出勤: {staffList.length}名）</div>
+          <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", padding: "12px 20px", fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+  <span>📅 {selectedDate} の予約状況　（出勤: {staffList.length}名）</span>
+  <div data-no-print style={{ display: "flex", gap: "8px" }}>
+    {(['A4', 'A3'] as const).map(p => (
+      <button key={p} onClick={() => printTimeline(p)} style={{ padding: "4px 12px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.1)", color: "white", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}>🖨 {p}で印刷</button>
+    ))}
+  </div>
+</div>
           <div ref={headerScrollRef} style={{ display: "flex", background: "#fcfcfc", borderBottom: "3px solid #d0d0d0", zIndex: 10, overflowX: "hidden" }}>
             <div style={{ width: SIDE_WIDTH, borderRight: "3px solid #d0d0d0", flexShrink: 0 }} />
             {Array.from({ length: totalHours }).map((_, i) => (<div key={i} style={{ width: COLUMN_WIDTH, textAlign: "center", padding: "10px 0", fontSize: "12px", fontWeight: "bold", color: "#888", borderRight: "3px solid #d0d0d0", flexShrink: 0 }}>{settings.startHour + i}:00</div>))}
