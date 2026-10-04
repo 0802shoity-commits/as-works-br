@@ -312,10 +312,13 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
       const available = scrollRef.current?.clientWidth ?? (window.innerWidth - 80);
       setColumnWidth(Math.max(40, ((available - SIDE_WIDTH - 1) / totalHours) * settings.columnWidthScale));
     };
-    const beforePrint = () => {
+        const beforePrint = () => {
       isPrinting = true;
-      // A4横の印刷幅に全時間帯が収まるように列幅を調整
-      flushSync(() => setColumnWidth((1040 - SIDE_WIDTH) / totalHours));
+      // 画面と同じ見た目のまま、用紙の幅に合わせて拡大・縮小
+      const timelineEl = document.querySelector('[data-print-timeline]') as HTMLElement | null;
+      const w = timelineEl?.offsetWidth ?? 1000;
+      document.documentElement.style.setProperty('--print-w', `${w}px`);
+      document.documentElement.style.setProperty('--print-zoom', String(printWidthRef.current / w));
     };
     const afterPrint = () => { isPrinting = false; calcWidth(); };
     calcWidth();
@@ -716,7 +719,7 @@ return (
         html, body { height: auto !important; overflow: visible !important; background: white !important; }
         .dash-root { height: auto !important; overflow: visible !important; background: white !important; }
         [data-no-print] { display: none !important; }
-        [data-print-timeline] { margin: 0 !important; flex: none !important; overflow: visible !important; }
+        [data-print-timeline] { margin: 0 !important; flex: none !important; overflow: visible !important; width: var(--print-w) !important; zoom: var(--print-zoom, 1); }
         [data-print-timeline] > div { flex: none !important; overflow: visible !important; box-shadow: none !important; }
         [data-print-scroll] { overflow: visible !important; flex: none !important; height: auto !important; }
       }
