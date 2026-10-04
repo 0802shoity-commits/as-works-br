@@ -46,6 +46,50 @@ const HOLIDAYS_2026 = [
   "2026-10-12", "2026-11-03", "2026-11-23", "2026-12-23"
 ];
 
+// ===== 一括ブロック =====
+type BlockSlot = {
+  id: number; reason: string; allDay: boolean; start: number; end: number;
+  mode: 'range' | 'dates' | 'weekly'; startDate: string | null; endDate: string | null;
+  days: number[]; specificDates: string[]; staffName: string | null; excludedDates: string[];
+};
+
+const BLOCK_REASONS = ["定休日", "臨時休業", "研修", "休憩"];
+
+const blockFromRow = (r: any): BlockSlot => ({
+  id: r.id, reason: r.reason || "休業", allDay: !!r.all_day,
+  start: r.start_time ?? 0, end: r.end_time ?? 0,
+  mode: (r.mode || "range") as BlockSlot['mode'],
+  startDate: r.start_date || null, endDate: r.end_date || null,
+  days: r.days || [], specificDates: r.specific_dates || [],
+  staffName: r.staff_name || null, excludedDates: r.excluded_dates || [],
+});
+
+const weekdayOf = (dateStr: string) => new Date(`${dateStr}T00:00:00`).getDay();
+
+const blockAppliesOn = (b: BlockSlot, dateStr: string) => {
+  if (b.excludedDates.includes(dateStr)) return false;
+  if (b.mode === "dates") return b.specificDates.includes(dateStr);
+  if (b.mode === "weekly") {
+    if (b.startDate && dateStr < b.startDate) return false;
+    return b.days.includes(weekdayOf(dateStr));
+  }
+  if (!b.startDate || !b.endDate) return false;
+  if (dateStr < b.startDate || dateStr > b.endDate) return false;
+  return b.days.length === 0 || b.days.includes(weekdayOf(dateStr));
+};
+
+const fmtMins = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+const describeBlock = (b: BlockSlot) => {
+  const dayNames = [...b.days].sort().map(d => DAYS_OF_WEEK[d]).join("・");
+  let when = "";
+  if (b.mode === "weekly") when = `毎週 ${dayNames}曜`;
+  else if (b.mode === "dates") when = b.specificDates.length > 3 ? `${b.specificDates.slice(0, 3).join(", ")} 他${b.specificDates.length - 3}日` : b.specificDates.join(", ");
+  else when = `${b.startDate} 〜 ${b.endDate}${dayNames ? `（${dayNames}）` : ""}`;
+  const time = b.allDay ? "終日" : `${fmtMins(b.start)}〜${fmtMins(b.end)}`;
+  return `${when}　${time}　${b.staffName ? `${b.staffName}のみ` : "全員"}`;
+};
+
 export default function ReservationPage() {
   const [userInitial, setUserInitial] = useState('?');
   const [userName, setUserName] = useState('');
@@ -73,6 +117,13 @@ const [userEmail, setUserEmail] = useState('');
   const supabase = createClient();
 
   const todayStr = useMemo(() => new Date().toLocaleDateString('sv-SE'), []);
+  const emptyBlockForm = (dateStr: string = todayStr) => ({
+    editingId: null as number | null,
+    mode: "range" as BlockSlot['mode'],
+    startDate: dateStr, endDate: dateStr,
+    specificDates: [] as string[], startTime: "12:00", endTime: "13:00", selectedDays: [] as number[],
+    allDay: false, reason: "定休日", staffName: "",
+  });
   const [currentViewDate, setCurrentViewDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [allStaff, setAllStaff] = useState<string[]>([]);
@@ -80,15 +131,13 @@ const [userEmail, setUserEmail] = useState('');
   const [workCategories, setWorkCategories] = useState(INITIAL_WORK_CATEGORIES);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [appointments, setAppointments] = useState<any[]>([]);
-  const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
+  const [blockedSlots, setBlockedSlots] = useState<BlockSlot[]>([]);
+  const [blockMenu, setBlockMenu] = useState<{ block: BlockSlot; x: number; y: number } | null>(null);
+  const [isBlockListOpen, setIsBlockListOpen] = useState(false);
   const [dayMemo, setDayMemo] = useState<{ [key: string]: string }>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
-  const [blockForm, setBlockForm] = useState({
-    mode: "range" as "range" | "multiple",
-    startDate: todayStr, endDate: todayStr,
-    specificDates: [] as string[], startTime: "12:00", endTime: "13:00", selectedDays: [] as number[],
-  });
+  const [blockForm, setBlockForm] = useState(() => emptyBlockForm());
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [addItemForm, setAddItemForm] = useState({ mode: "new" as "new" | "existing", categoryName: "", itemName: "", duration: 60, bgColor: "#f8bbd0", borderColor: "#e91e63" });
   const [tempBgColor, setTempBgColor] = useState("#f8bbd0");
@@ -217,6 +266,10 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
           customerName: a.customer_name, carModel: a.car_model, notes: a.notes, is_web: a.is_web,
         })));
       }
+
+      // 一括ブロックを読み込み
+      const { data: blockData } = await supabase.from('blocked_slots').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
+      if (blockData) setBlockedSlots(blockData.map(blockFromRow));
     };
     checkUser();
   }, []);
@@ -312,7 +365,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
       const available = scrollRef.current?.clientWidth ?? (window.innerWidth - 80);
       setColumnWidth(Math.max(40, ((available - SIDE_WIDTH - 1) / totalHours) * settings.columnWidthScale));
     };
-        const beforePrint = () => {
+    const beforePrint = () => {
       isPrinting = true;
       // 画面と同じ見た目のまま、用紙の幅に合わせて拡大・縮小
       const timelineEl = document.querySelector('[data-print-timeline]') as HTMLElement | null;
@@ -390,19 +443,20 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
 
   const filteredAppointments = useMemo(() => appointments.filter(app => app.date === selectedDate), [appointments, selectedDate]);
 
-  const filteredBlocks = useMemo(() => {
-    return blockedSlots.filter(b => {
-      if (b.specificDates && b.specificDates.includes(selectedDate)) return true;
-      if (b.startDate && b.endDate) {
-        const current = new Date(selectedDate);
-        if (current >= new Date(b.startDate) && current <= new Date(b.endDate)) {
-          if (!b.days || b.days.length === 0) return true;
-          if (b.days.includes(current.getDay())) return true;
-        }
-      }
-      return false;
-    });
-  }, [blockedSlots, selectedDate]);
+  const filteredBlocks = useMemo(() => blockedSlots.filter(b => blockAppliesOn(b, selectedDate)), [blockedSlots, selectedDate]);
+
+  // 終日ブロックはタイムラインの端から端まで
+  const blockRange = (b: BlockSlot) => b.allDay
+    ? { start: settings.startHour * 60, end: (settings.startHour + totalHours) * 60 }
+    : { start: b.start, end: b.end };
+
+  // カレンダー用：その日のブロック状態（closed=全員終日休み / partial=一部ブロック）
+  const getDayBlockState = (dayStr: string | null) => {
+    if (!dayStr) return null;
+    const bs = blockedSlots.filter(b => blockAppliesOn(b, dayStr));
+    if (bs.length === 0) return null;
+    return bs.some(b => b.allDay && !b.staffName) ? "closed" : "partial";
+  };
 
   const changeMonth = (offset: number) => {
     const newDate = new Date(currentViewDate);
@@ -520,16 +574,74 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
     setIsAddItemModalOpen(false);
   };
 
-  const saveBlockSetting = () => {
-    const [sH, sM] = blockForm.startTime.split(":").map(Number);
-    const [eH, eM] = blockForm.endTime.split(":").map(Number);
-    const newBlock = { id: Date.now(), startTime: blockForm.startTime, endTime: blockForm.endTime, start: sH * 60 + sM, end: eH * 60 + eM, ...(blockForm.mode === "range" ? { startDate: blockForm.startDate, endDate: blockForm.endDate, days: blockForm.selectedDays } : { specificDates: blockForm.specificDates }) };
-    setBlockedSlots(prev => [...prev, newBlock]);
-    setIsModalOpen(false);
-    setBlockForm({ ...blockForm, specificDates: [], selectedDays: [] });
+  // ===== 一括ブロック：作成・編集・解除・削除 =====
+  const openNewBlock = () => {
+    setBlockForm(emptyBlockForm(selectedDate));
+    setIsModalOpen(true);
   };
 
-  const removeBlock = (id: number) => setBlockedSlots(prev => prev.filter(b => b.id !== id));
+  const saveBlockSetting = async () => {
+    if (!userId) return;
+    const f = blockForm;
+    const [sH, sM] = f.startTime.split(":").map(Number);
+    const [eH, eM] = f.endTime.split(":").map(Number);
+    const start = sH * 60 + sM, end = eH * 60 + eM;
+    if (f.mode === "range" && f.startDate > f.endDate) { alert("終了日は開始日以降にしてください"); return; }
+    if (f.mode === "dates" && f.specificDates.length === 0) { alert("日付を1つ以上選んでください"); return; }
+    if (f.mode === "weekly" && f.selectedDays.length === 0) { alert("曜日を1つ以上選んでください"); return; }
+    if (!f.allDay && start >= end) { alert("終了時刻は開始時刻より後にしてください"); return; }
+    const row = {
+      user_id: userId,
+      reason: f.reason.trim() || "休業",
+      all_day: f.allDay,
+      start_time: f.allDay ? null : start,
+      end_time: f.allDay ? null : end,
+      mode: f.mode,
+      start_date: f.mode === "range" ? f.startDate : null,
+      end_date: f.mode === "range" ? f.endDate : null,
+      days: f.mode === "dates" ? [] : f.selectedDays,
+      specific_dates: f.mode === "dates" ? [...f.specificDates].sort() : [],
+      staff_name: f.staffName || null,
+    };
+    if (f.editingId) {
+      const { data, error } = await supabase.from('blocked_slots').update(row).eq('id', f.editingId).select().single();
+      if (error || !data) { alert('保存に失敗しました: ' + (error?.message || '')); return; }
+      setBlockedSlots(prev => prev.map(b => b.id === f.editingId ? blockFromRow(data) : b));
+    } else {
+      const { data, error } = await supabase.from('blocked_slots').insert(row).select().single();
+      if (error || !data) { alert('保存に失敗しました: ' + (error?.message || '')); return; }
+      setBlockedSlots(prev => [...prev, blockFromRow(data)]);
+    }
+    setIsModalOpen(false);
+    setBlockForm(emptyBlockForm(selectedDate));
+  };
+
+  const editBlock = (b: BlockSlot) => {
+    setBlockForm({
+      editingId: b.id, mode: b.mode,
+      startDate: b.startDate || selectedDate, endDate: b.endDate || selectedDate,
+      specificDates: b.specificDates,
+      startTime: fmtMins(b.allDay ? 12 * 60 : b.start), endTime: fmtMins(b.allDay ? 13 * 60 : b.end),
+      selectedDays: b.days, allDay: b.allDay, reason: b.reason, staffName: b.staffName || "",
+    });
+    setBlockMenu(null); setIsBlockListOpen(false); setIsModalOpen(true);
+  };
+
+  const excludeBlockDate = async (b: BlockSlot, date: string) => {
+    const next = [...b.excludedDates, date];
+    const { error } = await supabase.from('blocked_slots').update({ excluded_dates: next }).eq('id', b.id);
+    if (error) { alert('解除に失敗しました: ' + error.message); return; }
+    setBlockedSlots(prev => prev.map(x => x.id === b.id ? { ...x, excludedDates: next } : x));
+    setBlockMenu(null);
+  };
+
+  const deleteBlock = async (b: BlockSlot) => {
+    if (!window.confirm(`「${b.reason}」のブロック設定をすべて削除しますか？\n\n${describeBlock(b)}`)) return;
+    const { error } = await supabase.from('blocked_slots').delete().eq('id', b.id);
+    if (error) { alert('削除に失敗しました: ' + error.message); return; }
+    setBlockedSlots(prev => prev.filter(x => x.id !== b.id));
+    setBlockMenu(null);
+  };
 
   const handleColorChange = (e: React.MouseEvent, categoryName: string, itemTitle: string) => {
     e.preventDefault();
@@ -645,10 +757,14 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
       if (staff) {
         let duration = 60;
         for (const category of workCategories) { const item = category.items.find(i => i.title === draggingNewType); if (item) { duration = item.duration || 60; break; } }
-        const staffApps = appointments.filter(a => a.staff === staff && a.date === selectedDate).sort((a, b) => a.start - b.start);
+        // 既存の予定＋一括ブロックの時間は避けて配置
+        const occupied = [
+          ...appointments.filter(a => a.staff === staff && a.date === selectedDate).map(a => ({ start: a.start, end: a.end })),
+          ...filteredBlocks.filter(b => !b.staffName || b.staffName === staff).map(blockRange),
+        ].sort((a, b) => a.start - b.start);
         let bestStart = Math.floor(getTimeFromX(mousePos.x) / 60) * 60;
-        for (const app of staffApps) { if (bestStart >= app.start && bestStart < app.end) bestStart = app.end; }
-        for (const app of staffApps) { if (bestStart + duration > app.start && bestStart < app.end) bestStart = app.end; }
+        for (const app of occupied) { if (bestStart >= app.start && bestStart < app.end) bestStart = app.end; }
+        for (const app of occupied) { if (bestStart + duration > app.start && bestStart < app.end) bestStart = app.end; }
         if (bestStart + duration <= settings.endHour * 60) {
           const newApp = { id: Date.now(), staff, start: bestStart, end: bestStart + duration, title: draggingNewType, date: selectedDate, customerName: "", carModel: "", notes: "" };
           if (userId) await supabase.from('appointments').insert({ id: newApp.id, user_id: userId, staff, title: draggingNewType, date: selectedDate, start_time: bestStart, end_time: bestStart + duration, customer_name: "", car_model: "", notes: "" });
@@ -709,6 +825,20 @@ const subIconImgStyle = {
   flexShrink: 0 
 };
 
+  // ブロック設定モーダル用の部品
+  const blockLabelStyle = { fontSize: "13px", color: "#555", marginBottom: "8px", fontWeight: "bold" as const };
+  const renderDayPicker = () => (
+    <div style={{ display: "flex", gap: "5px" }}>
+      {DAYS_OF_WEEK.map((day, idx) => {
+        const on = blockForm.selectedDays.includes(idx);
+        return (
+          <div key={day} onClick={() => { const newDays = on ? blockForm.selectedDays.filter(d => d !== idx) : [...blockForm.selectedDays, idx]; setBlockForm({ ...blockForm, selectedDays: newDays }); }}
+            style={{ flex: 1, height: "36px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "bold", background: on ? "#7d2ae8" : "#f0f0f0", color: on ? "white" : (idx === 0 ? "#ef4444" : idx === 6 ? "#3b82f6" : "#333"), border: on ? "2px solid #7d2ae8" : "2px solid #d0d0d0", transition: "0.15s" }}>{day}</div>
+        );
+      })}
+    </div>
+  );
+
 return (
   <div style={{ height: "100vh", background: "#f8f9fa", display: "flex", flexDirection: "column", overflow: "hidden", userSelect: "none" }} className="dash-root" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
     <style>{`
@@ -768,7 +898,7 @@ return (
         </div>
 
         {/* 一括ブロック */}
-        <div onClick={() => setIsModalOpen(true)} style={headerButtonStyle} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-6px) scale(1.15)"} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)"}>
+        <div onClick={openNewBlock} style={headerButtonStyle} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-6px) scale(1.15)"} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)"}>
           <div style={iconCircleStyle}>
             <img src="/ikkatuburok.png" alt="" style={iconImgStyle} />
           </div>
@@ -935,7 +1065,161 @@ return (
 
       {selectedAppointment && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setSelectedAppointment(null)}><div ref={detailModalRef} style={{ width: "520px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }} onClick={e => e.stopPropagation()}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>予約詳細</span><span onClick={() => setSelectedAppointment(null)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>予約項目</div><div style={{ fontSize: "15px", fontWeight: "bold", color: "#333", padding: "10px", background: "#f5f5f5", borderRadius: "6px", border: "2px solid #d0d0d0" }}>{editForm.title}</div></div>{[{ label: "お客様名", key: "customerName", placeholder: "お客様名を入力", type: "text" },{ label: "電話番号", key: "phone", placeholder: "090-0000-0000", type: "tel" },{ label: "その他", key: "carModel", placeholder: "メモを入力", type: "text" }].map(({ label, key, placeholder, type }) => (<div key={key} style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>{label}</div><input type={type} value={editForm[key as keyof typeof editForm]} onChange={e => setEditForm({ ...editForm, [key]: e.target.value })} placeholder={placeholder} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div>))}<div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>日付</div><input type="date" value={editForm.date} onChange={e => setEditForm({ ...editForm, date: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>スタッフ</div><input type="text" value={editForm.staff} onChange={e => setEditForm({ ...editForm, staff: e.target.value })} placeholder="スタッフ名を入力" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>時間</div><div style={{ display: "flex", alignItems: "center", gap: "10px" }}>{renderTimeSelect(editForm.startTime, v => setEditForm({ ...editForm, startTime: v }))}<span>〜</span>{renderTimeSelect(editForm.endTime, v => setEditForm({ ...editForm, endTime: v }))}</div></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>備考</div><textarea value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="備考を入力" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", minHeight: "80px", fontFamily: "inherit" }} /></div><div style={{ display: "flex", gap: "10px", marginTop: "25px" }}><button onClick={() => setSelectedAppointment(null)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer", fontSize: "13px" }}>キャンセル</button>{userPlan === 'premium' && <button onClick={() => { const params = new URLSearchParams({ name: editForm.customerName || '', phone: editForm.phone || '', carModel: editForm.carModel || '', workType: editForm.title || '', workDate: editForm.date || '', notes: editForm.notes || '' }); router.push(`/customer-register?${params.toString()}`); }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#10b981", color: "white", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>👤 顧客登録</button>}<button onClick={deleteAppointment} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #ff5252", background: "white", color: "#ff5252", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>削除</button><button onClick={saveAppointmentDetail} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>保存</button></div></div></div>)}
 
-      {isModalOpen && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "480px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>予約不可設定</span><span onClick={() => setIsModalOpen(false)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "4px", marginBottom: "20px" }}><div onClick={() => setBlockForm({ ...blockForm, mode: "range" })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: blockForm.mode === "range" ? "white" : "transparent", fontWeight: blockForm.mode === "range" ? "bold" : "normal" }}>期間で指定</div><div onClick={() => setBlockForm({ ...blockForm, mode: "multiple" })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: blockForm.mode === "multiple" ? "white" : "transparent", fontWeight: blockForm.mode === "multiple" ? "bold" : "normal" }}>とびとびで指定</div></div><div style={{ marginBottom: "20px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>日程を選択</div>{blockForm.mode === "range" ? (<div style={{ display: "flex", alignItems: "center", gap: "10px" }}><input type="date" value={blockForm.startDate} onChange={e => setBlockForm({ ...blockForm, startDate: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} /><span>〜</span><input type="date" value={blockForm.endDate} onChange={e => setBlockForm({ ...blockForm, endDate: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} /></div>) : (<div><input type="date" onChange={e => { if (e.target.value && !blockForm.specificDates.includes(e.target.value)) setBlockForm({ ...blockForm, specificDates: [...blockForm.specificDates, e.target.value] }); }} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0", marginBottom: "10px" }} /><div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{blockForm.specificDates.map(d => (<div key={d} style={{ background: "#f3e8ff", color: "#7d2ae8", padding: "4px 10px", borderRadius: "15px", fontSize: "11px", display: "flex", alignItems: "center", gap: "5px" }}>{d} <span onClick={() => setBlockForm({ ...blockForm, specificDates: blockForm.specificDates.filter(date => date !== d) })} style={{ cursor: "pointer" }}>×</span></div>))}</div></div>)}</div><div style={{ marginBottom: "20px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>時間帯を選択</div><div style={{ display: "flex", alignItems: "center", gap: "10px" }}><input type="time" value={blockForm.startTime} onChange={e => setBlockForm({ ...blockForm, startTime: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} /><span>〜</span><input type="time" value={blockForm.endTime} onChange={e => setBlockForm({ ...blockForm, endTime: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} /></div></div>{blockForm.mode === "range" && (<div style={{ marginBottom: "25px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>特定の曜日のみ (任意)</div><div style={{ display: "flex", gap: "5px" }}>{DAYS_OF_WEEK.map((day, idx) => (<div key={day} onClick={() => { const newDays = blockForm.selectedDays.includes(idx) ? blockForm.selectedDays.filter(d => d !== idx) : [...blockForm.selectedDays, idx]; setBlockForm({ ...blockForm, selectedDays: newDays }); }} style={{ flex: 1, height: "35px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", cursor: "pointer", fontSize: "12px", background: blockForm.selectedDays.includes(idx) ? "#7d2ae8" : "#f0f0f0", color: blockForm.selectedDays.includes(idx) ? "white" : "#333", border: blockForm.selectedDays.includes(idx) ? "2px solid #7d2ae8" : "2px solid #d0d0d0" }}>{day}</div>))}</div></div>)}<div style={{ display: "flex", gap: "10px" }}><button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>キャンセル</button><button onClick={saveBlockSetting} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>設定を保存</button></div></div></div>)}
+      {/* ===== 一括ブロック 作成・編集モーダル ===== */}
+      {isModalOpen && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setIsModalOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "540px", maxHeight: "90vh", overflowY: "auto", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)", animation: "catOpen 0.3s cubic-bezier(0.22, 1, 0.36, 1)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <span style={{ fontSize: "18px", fontWeight: "bold" }}>{blockForm.editingId ? "✏️ ブロックを編集" : "🚫 予約不可（ブロック）設定"}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                {!blockForm.editingId && (
+                  <span onClick={() => { setIsModalOpen(false); setIsBlockListOpen(true); }} style={{ fontSize: "12px", color: "#7d2ae8", fontWeight: "bold", cursor: "pointer", padding: "4px 10px", border: "2px solid #e9d5ff", borderRadius: "14px" }}>📋 設定済み（{blockedSlots.length}件）</span>
+                )}
+                <span onClick={() => setIsModalOpen(false)} style={{ cursor: "pointer", color: "#ccc", fontSize: "20px" }}>×</span>
+              </div>
+            </div>
+
+            {/* 理由 */}
+            <div style={{ marginBottom: "20px" }}>
+              <div style={blockLabelStyle}>理由（タイムラインに表示されます）</div>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+                {BLOCK_REASONS.map(r => (
+                  <div key={r} onClick={() => setBlockForm({ ...blockForm, reason: r })} style={{ padding: "6px 14px", borderRadius: "16px", cursor: "pointer", fontSize: "13px", fontWeight: "bold", background: blockForm.reason === r ? "#7d2ae8" : "#f3f4f6", color: blockForm.reason === r ? "white" : "#555", border: `2px solid ${blockForm.reason === r ? "#7d2ae8" : "#e5e7eb"}` }}>{r}</div>
+                ))}
+              </div>
+              <input type="text" value={blockForm.reason} onChange={e => setBlockForm({ ...blockForm, reason: e.target.value })} placeholder="自由入力も可（例：棚卸し）" style={{ width: "100%", padding: "9px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} />
+            </div>
+
+            {/* 指定方法 */}
+            <div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "4px", marginBottom: "16px" }}>
+              {([["range", "期間で指定"], ["dates", "日付を選ぶ"], ["weekly", "毎週の繰り返し"]] as const).map(([m, label]) => (
+                <div key={m} onClick={() => setBlockForm({ ...blockForm, mode: m })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: blockForm.mode === m ? "white" : "transparent", fontWeight: blockForm.mode === m ? "bold" : "normal", boxShadow: blockForm.mode === m ? "0 1px 4px rgba(0,0,0,0.1)" : "none" }}>{label}</div>
+              ))}
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              {blockForm.mode === "range" && (
+                <>
+                  <div style={blockLabelStyle}>期間</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                    <input type="date" value={blockForm.startDate} onChange={e => setBlockForm({ ...blockForm, startDate: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} />
+                    <span>〜</span>
+                    <input type="date" value={blockForm.endDate} onChange={e => setBlockForm({ ...blockForm, endDate: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} />
+                  </div>
+                  <div style={{ ...blockLabelStyle, fontWeight: "normal" as const, color: "#888" }}>特定の曜日のみ（任意・選ばなければ期間中すべて）</div>
+                  {renderDayPicker()}
+                </>
+              )}
+              {blockForm.mode === "dates" && (
+                <>
+                  <div style={blockLabelStyle}>日付を選んで追加</div>
+                  <input type="date" value="" onChange={e => { if (e.target.value && !blockForm.specificDates.includes(e.target.value)) setBlockForm({ ...blockForm, specificDates: [...blockForm.specificDates, e.target.value].sort() }); }} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0", marginBottom: "10px", boxSizing: "border-box" }} />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {blockForm.specificDates.length === 0 && <span style={{ fontSize: "12px", color: "#bbb" }}>まだ日付が選ばれていません</span>}
+                    {blockForm.specificDates.map(d => (
+                      <div key={d} style={{ background: "#f3e8ff", color: "#7d2ae8", padding: "4px 10px", borderRadius: "15px", fontSize: "12px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}>{d} <span onClick={() => setBlockForm({ ...blockForm, specificDates: blockForm.specificDates.filter(date => date !== d) })} style={{ cursor: "pointer" }}>×</span></div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {blockForm.mode === "weekly" && (
+                <>
+                  <div style={blockLabelStyle}>毎週ブロックする曜日（期限なし）</div>
+                  {renderDayPicker()}
+                  <div style={{ fontSize: "11px", color: "#999", marginTop: "8px" }}>例：水曜日を選ぶと「毎週水曜日は定休日」になります。特定の日だけ営業する場合は、タイムライン上で「この日だけ解除」できます。</div>
+                </>
+              )}
+            </div>
+
+            {/* 時間 */}
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <div style={{ ...blockLabelStyle, marginBottom: 0 }}>時間帯</div>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                  <span style={{ fontSize: "13px", fontWeight: "bold", color: blockForm.allDay ? "#7d2ae8" : "#888" }}>終日</span>
+                  <div onClick={() => setBlockForm({ ...blockForm, allDay: !blockForm.allDay })} style={{ width: "42px", height: "24px", borderRadius: "12px", background: blockForm.allDay ? "#7d2ae8" : "#e5e7eb", position: "relative", transition: "background 0.2s" }}>
+                    <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "white", position: "absolute", top: "2px", left: blockForm.allDay ? "20px" : "2px", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+                  </div>
+                </label>
+              </div>
+              {blockForm.allDay ? (
+                <div style={{ padding: "10px", background: "#f3e8ff", borderRadius: "6px", fontSize: "13px", color: "#7d2ae8", fontWeight: "bold", textAlign: "center" }}>1日まるごと予約不可になります</div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {renderTimeSelect(blockForm.startTime, v => setBlockForm({ ...blockForm, startTime: v }))}
+                  <span>〜</span>
+                  {renderTimeSelect(blockForm.endTime, v => setBlockForm({ ...blockForm, endTime: v }))}
+                </div>
+              )}
+            </div>
+
+            {/* 対象スタッフ */}
+            <div style={{ marginBottom: "25px" }}>
+              <div style={blockLabelStyle}>対象</div>
+              <select value={blockForm.staffName} onChange={e => setBlockForm({ ...blockForm, staffName: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", background: "white" }}>
+                <option value="">全員（お店全体）</option>
+                {allStaff.map(s => <option key={s} value={s}>{s} のみ</option>)}
+              </select>
+              <div style={{ fontSize: "11px", color: "#999", marginTop: "6px" }}>スタッフを選ぶと、その人の行だけブロックされます（WEB予約の受付枠も1つ減ります）</div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>キャンセル</button>
+              <button onClick={saveBlockSetting} style={{ flex: 2, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>{blockForm.editingId ? "変更を保存" : "設定を保存"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== 設定済みブロック一覧 ===== */}
+      {isBlockListOpen && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setIsBlockListOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "580px", maxHeight: "85vh", display: "flex", flexDirection: "column", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)", animation: "catOpen 0.3s cubic-bezier(0.22, 1, 0.36, 1)" }}>
+            <div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "16px", display: "flex", justifyContent: "space-between" }}>
+              <span>📋 設定済みのブロック</span>
+              <span onClick={() => setIsBlockListOpen(false)} style={{ cursor: "pointer", color: "#ccc" }}>×</span>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
+              {blockedSlots.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#999", fontSize: "13px" }}>設定済みのブロックはありません</div>
+              ) : blockedSlots.map((b, idx) => (
+                <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", border: "2px solid #e5e7eb", borderLeft: "5px solid #9ca3af", borderRadius: "10px", animation: `catItemIn 0.3s ease ${idx * 0.03}s both` }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: "bold", fontSize: "14px", color: "#111827" }}>🚫 {b.reason}</div>
+                    <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px" }}>{describeBlock(b)}</div>
+                    {b.excludedDates.length > 0 && <div style={{ fontSize: "11px", color: "#2563eb", marginTop: "3px" }}>解除済みの日：{b.excludedDates.join(", ")}</div>}
+                  </div>
+                  <button onClick={() => editBlock(b)} style={{ padding: "6px 12px", borderRadius: "6px", border: "2px solid #7d2ae8", background: "white", color: "#7d2ae8", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>編集</button>
+                  <button onClick={() => deleteBlock(b)} style={{ padding: "6px 12px", borderRadius: "6px", border: "2px solid #ef4444", background: "white", color: "#ef4444", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>削除</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => { setIsBlockListOpen(false); openNewBlock(); }} style={{ padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>＋ 新しいブロックを追加</button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ブロックをクリックしたときのメニュー ===== */}
+      {blockMenu && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1500 }} onClick={() => setBlockMenu(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ position: "fixed", left: Math.min(blockMenu.x, window.innerWidth - 300), top: Math.min(blockMenu.y, window.innerHeight - 250), width: "280px", background: "white", borderRadius: "12px", boxShadow: "0 12px 32px rgba(0,0,0,0.2)", border: "1px solid #e5e7eb", overflow: "hidden", animation: "catOpen 0.25s cubic-bezier(0.22, 1, 0.36, 1)" }}>
+            <div style={{ padding: "12px 14px", background: "#f3f4f6", borderBottom: "1px solid #e5e7eb" }}>
+              <div style={{ fontWeight: "bold", fontSize: "14px", color: "#111827" }}>🚫 {blockMenu.block.reason}</div>
+              <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px", lineHeight: 1.5 }}>{describeBlock(blockMenu.block)}</div>
+            </div>
+            {[
+              { label: `📅 この日（${selectedDate}）だけ解除`, color: "#2563eb", onClick: () => excludeBlockDate(blockMenu.block, selectedDate) },
+              { label: "✏️ この設定を編集", color: "#7d2ae8", onClick: () => editBlock(blockMenu.block) },
+              { label: "🗑 この設定をすべて削除", color: "#ef4444", onClick: () => deleteBlock(blockMenu.block) },
+            ].map(btn => (
+              <div key={btn.label} onClick={btn.onClick} style={{ padding: "11px 14px", fontSize: "13px", fontWeight: "bold", color: btn.color, cursor: "pointer", borderBottom: "1px solid #f3f4f6" }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#f9fafb"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "white"}>{btn.label}</div>
+            ))}
+            <div onClick={() => setBlockMenu(null)} style={{ padding: "10px 14px", fontSize: "12px", color: "#9ca3af", textAlign: "center", cursor: "pointer" }}>閉じる</div>
+          </div>
+        </div>
+      )}
 
       <div data-no-print style={{ margin: "15px 20px", background: "white", borderRadius: "12px", padding: "15px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", display: "flex", gap: "20px", height: "240px", border: "2px solid #e8e8e8" }}>
         <div style={{ flex: 1, display: "flex", gap: "10px", borderRight: "3px solid #d0d0d0", paddingRight: "15px", alignItems: "center", justifyContent: "center", height: "100%" }}>
@@ -944,7 +1228,17 @@ return (
             <div style={{ fontSize: "16px", fontWeight: "bold", textAlign: "center", marginBottom: "8px", letterSpacing: "2px", fontFamily: "'Montserrat', sans-serif", color: "#1a1a2e" }}>{currentViewDate.getFullYear()} / {currentViewDate.getMonth() + 1}</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", border: "2px solid #d0d0d0", background: "#fcfcfc", width: "100%" }}>
               {displayDaysOfWeek.map((day, i) => (<div key={i} style={{ height: "28px", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", borderBottom: "2px solid #d0d0d0", color: (settings.startDayOfWeek === 0 ? i === 0 : i === 6) ? "#ff5252" : "#666" }}>{day}</div>))}
-              {getCalendarDays(currentViewDate).map((dayStr, i) => (<div key={i} onClick={() => dayStr && setSelectedDate(dayStr)} style={{ height: "28px", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", cursor: dayStr ? "pointer" : "default", background: dayStr === selectedDate ? "#7d2ae8" : "white", color: dayStr === selectedDate ? "white" : (isRedDay(dayStr) ? "#ff5252" : "#333"), border: "1px solid #d0d0d0" }}>{dayStr ? new Date(dayStr).getDate() : ""}</div>))}
+              {getCalendarDays(currentViewDate).map((dayStr, i) => {
+                const bState = getDayBlockState(dayStr);
+                const isSel = dayStr === selectedDate;
+                return (
+                  <div key={i} onClick={() => dayStr && setSelectedDate(dayStr)} title={bState === "closed" ? "休業日" : bState === "partial" ? "一部ブロックあり" : undefined}
+                    style={{ position: "relative", height: "28px", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", cursor: dayStr ? "pointer" : "default", background: isSel ? "#7d2ae8" : bState === "closed" ? "#e5e7eb" : "white", color: isSel ? "white" : bState === "closed" ? "#9ca3af" : (isRedDay(dayStr) ? "#ff5252" : "#333"), border: "1px solid #d0d0d0", textDecoration: bState === "closed" && !isSel ? "line-through" : "none" }}>
+                    {dayStr ? new Date(dayStr).getDate() : ""}
+                    {bState === "partial" && <span style={{ position: "absolute", top: "3px", right: "3px", width: "6px", height: "6px", borderRadius: "50%", background: isSel ? "white" : "#f59e0b" }} />}
+                  </div>
+                );
+              })}
             </div>
           </div>
           <button onClick={() => changeMonth(1)} style={{ background: "none", border: "2px solid #d0d0d0", borderRadius: "4px", padding: "5px", flexShrink: 0 }}>▶</button>
@@ -956,7 +1250,7 @@ return (
           <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", fontWeight: "bold", textAlign: "center" }}>📅 本日の予約: {filteredAppointments.filter(a => staffList.includes(a.staff) && a.title !== "ブロック").length}件</div>
         </div>
 
-                       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", minWidth: 0 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", minWidth: 0 }}>
           {(() => {
             const openCat = workCategories.find(c => c.category === expandedCategory);
             const tileBase = { position: "relative" as const, aspectRatio: "1 / 1", borderRadius: "10px", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", padding: "6px", textAlign: "center" as const, boxSizing: "border-box" as const, transition: "transform 0.2s ease, box-shadow 0.2s ease" };
@@ -1056,11 +1350,11 @@ return (
     ))}
   </div>
 </div>
-          <div ref={headerScrollRef} style={{ display: "flex", background: "#fcfcfc", borderBottom: "3px solid #d0d0d0", zIndex: 10, overflowX: "hidden" }}>
+          <div ref={headerScrollRef} data-print-scroll style={{ display: "flex", background: "#fcfcfc", borderBottom: "3px solid #d0d0d0", zIndex: 10, overflowX: "hidden" }}>
             <div style={{ width: SIDE_WIDTH, borderRight: "3px solid #d0d0d0", flexShrink: 0 }} />
             {Array.from({ length: totalHours }).map((_, i) => (<div key={i} style={{ width: COLUMN_WIDTH, textAlign: "center", padding: "10px 0", fontSize: "12px", fontWeight: "bold", color: "#888", borderRight: "3px solid #d0d0d0", flexShrink: 0 }}>{settings.startHour + i}:00</div>))}
           </div>
-          <div ref={scrollRef} style={{ position: "relative", overflowX: "auto", overflowY: "auto", flex: 1 }}>
+          <div ref={scrollRef} data-print-scroll style={{ position: "relative", overflowX: "auto", overflowY: "auto", flex: 1 }}>
             <div style={{ width: "fit-content", minWidth: "100%", position: "relative" }}>
               {staffList.length === 0 ? (<div style={{ textAlign: "center", padding: "40px", color: "#999", fontSize: "14px" }}>「出勤設定」から本日の出勤スタッフを選択してください</div>) : (
                 staffList.map((staff) => (
@@ -1089,7 +1383,19 @@ return (
                       }} style={{ width: "22px", height: "22px", borderRadius: "50%", background: staff.startsWith('予約枠') ? "#f59e0b" : "#7d2ae8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "11px", cursor: "pointer", flexShrink: 0 }}>{staff.startsWith('予約枠') ? '👤' : '✎'}</div>
                     </div>
                     <div style={{ flex: 1, display: "flex" }}>{Array.from({ length: totalHours * 4 }).map((_, i) => (<div key={i} style={{ width: COLUMN_WIDTH / 4, borderRight: i % 4 === 3 ? "2px solid #c0c0c0" : i % 2 === 1 ? "1px solid #d8d8d8" : "1px dashed #b0b0b0", flexShrink: 0 }} />))}</div>
-                    {filteredBlocks.map((block) => { const bLeft = ((block.start / 60) - settings.startHour) * COLUMN_WIDTH; const bWidth = ((block.end - block.start) / 60) * COLUMN_WIDTH; return (<div key={block.id} onClick={() => removeBlock(block.id)} style={{ position: "absolute", left: SIDE_WIDTH + bLeft, top: 0, width: bWidth, height: "100%", background: "repeating-linear-gradient(45deg, #f5f5f5, #f5f5f5 10px, #eeeeee 10px, #eeeeee 20px)", zIndex: 2, cursor: "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: "10px", fontWeight: "bold" }}>CLOSED ×</div>); })}
+                    {filteredBlocks.filter(b => !b.staffName || b.staffName === staff).map((block) => {
+                      const r = blockRange(block);
+                      const bLeft = ((r.start / 60) - settings.startHour) * COLUMN_WIDTH;
+                      const bWidth = ((r.end - r.start) / 60) * COLUMN_WIDTH;
+                      return (
+                        <div key={block.id} onClick={(e) => { e.stopPropagation(); setBlockMenu({ block, x: e.clientX, y: e.clientY }); }} title="クリックで解除・編集"
+                          style={{ position: "absolute", left: SIDE_WIDTH + bLeft, top: 2, width: bWidth, height: "calc(100% - 4px)", background: "repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 8px, #d1d5db 8px, #d1d5db 16px)", border: "2px solid #9ca3af", borderRadius: "6px", boxSizing: "border-box", zIndex: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                          <span style={{ background: "rgba(255,255,255,0.92)", padding: "3px 12px", borderRadius: "12px", fontSize: settings.isCompact ? "11px" : "13px", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}>
+                            🚫 {block.reason}{block.allDay ? "（終日）" : `（${fmtMins(block.start)}〜${fmtMins(block.end)}）`}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 ))
               )}

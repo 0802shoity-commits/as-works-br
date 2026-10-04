@@ -3,6 +3,22 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '../lib/supabase';
 import { getBusinessType } from '../lib/businessTypes';
 
+// 一括ブロックがその日に適用されるか（ダッシュボードと同じ判定）
+const weekdayOf = (dateStr: string) => new Date(`${dateStr}T00:00:00`).getDay();
+const blockAppliesOn = (b: any, dateStr: string) => {
+  if ((b.excluded_dates || []).includes(dateStr)) return false;
+  if (b.mode === 'dates') return (b.specific_dates || []).includes(dateStr);
+  if (b.mode === 'weekly') {
+    if (b.start_date && dateStr < b.start_date) return false;
+    return (b.days || []).includes(weekdayOf(dateStr));
+  }
+  if (!b.start_date || !b.end_date) return false;
+  if (dateStr < b.start_date || dateStr > b.end_date) return false;
+  const days = b.days || [];
+  return days.length === 0 || days.includes(weekdayOf(dateStr));
+};
+const blockOverlaps = (b: any, start: number, end: number) => b.all_day || (start < b.end_time && end > b.start_time);
+
 export default function BookingPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -27,10 +43,12 @@ export default function BookingPage() {
   const [shopImageSize, setShopImageSize] = useState(140);
   const [shopImageX, setShopImageX] = useState(50);
 
-  const [slotStatus, setSlotStatus] = useState<{ [time: string]: 'available' | 'few' | 'full' }>({});
+  const [slotStatus, setSlotStatus] = useState<{ [time: string]: 'available' | 'few' | 'full' | 'closed' }>({});
   const [slotLoading, setSlotLoading] = useState(false);
   const [ownerStartHour, setOwnerStartHour] = useState(9);
   const [ownerEndHour, setOwnerEndHour] = useState(19);
+  const [dayBlocks, setDayBlocks] = useState<any[]>([]);
+  const [dayClosedReason, setDayClosedReason] = useState<string | null>(null);
 
   const TIME_SLOTS: string[] = [];
   for (let h = ownerStartHour; h < ownerEndHour; h++) {
@@ -52,8 +70,8 @@ export default function BookingPage() {
         const { data: settingsData } = await supabase
           .from('user_settings').select('business_type, start_hour, end_hour, shop_name, shop_description, shop_bg_color, shop_image_url, shop_name_size, shop_desc_size, shop_image_size, shop_image_x').eq('user_id', id).maybeSingle();
         if (settingsData?.business_type) setBusinessType(settingsData.business_type);
-if (settingsData?.start_hour != null) setOwnerStartHour(settingsData.start_hour);
-if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
+        if (settingsData?.start_hour != null) setOwnerStartHour(settingsData.start_hour);
+        if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
         if (settingsData?.shop_name) setShopName(settingsData.shop_name);
         if (settingsData?.shop_description) setShopDescription(settingsData.shop_description);
         if (settingsData?.shop_bg_color) setShopBgColor(settingsData.shop_bg_color);
@@ -78,12 +96,26 @@ if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
       const { data: settingsData } = await supabase.from('user_settings').select('booking_slots').eq('user_id', ownerId).maybeSingle();
       const maxSlots = settingsData?.booking_slots || 2;
       const { data: appData } = await supabase.from('appointments').select('start_time, end_time').eq('user_id', ownerId).eq('date', dateStr);
-      const newStatus: { [time: string]: 'available' | 'few' | 'full' } = {};
+
+      // 一括ブロック（休業日・休憩など）
+      const { data: blockData } = await supabase.from('blocked_slots').select('*').eq('user_id', ownerId);
+      const blocks = (blockData || []).filter((b: any) => blockAppliesOn(b, dateStr));
+      setDayBlocks(blocks);
+      const shopBlocks = blocks.filter((b: any) => !b.staff_name);   // お店全体
+      const staffBlocks = blocks.filter((b: any) => b.staff_name);   // 特定スタッフのみ
+      const closedAllDay = shopBlocks.find((b: any) => b.all_day);
+      setDayClosedReason(closedAllDay ? (closedAllDay.reason || '休業') : null);
+
+      const newStatus: { [time: string]: 'available' | 'few' | 'full' | 'closed' } = {};
       for (const slot of TIME_SLOTS) {
         const [h, m] = slot.split(':').map(Number);
         const slotStart = h * 60 + m;
         const slotEnd = slotStart + 30;
-        const overlapping = (appData || []).filter((a: any) => slotStart < a.end_time && slotEnd > a.start_time).length;
+        const workEnd = slotStart + selectedItemDuration;
+        // お店全体のブロックに作業時間がかかる場合は受付不可
+        if (shopBlocks.some((b: any) => blockOverlaps(b, slotStart, workEnd))) { newStatus[slot] = 'closed'; continue; }
+        const overlapping = (appData || []).filter((a: any) => slotStart < a.end_time && slotEnd > a.start_time).length
+          + staffBlocks.filter((b: any) => blockOverlaps(b, slotStart, slotEnd)).length;
         if (overlapping >= maxSlots) newStatus[slot] = 'full';
         else if (overlapping >= maxSlots - 1 && maxSlots > 1) newStatus[slot] = 'few';
         else newStatus[slot] = 'available';
@@ -130,7 +162,8 @@ if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
       for (let i = 1; i <= remainingSlots; i++) candidates.push(`予約枠${i}`);
       let assignedStaff = candidates[0] || '予約枠1';
       for (const candidate of candidates) {
-        const hasConflict = (appData || []).some((a: any) => a.staff === candidate && startMins < a.end_time && endMins > a.start_time);
+        const hasConflict = (appData || []).some((a: any) => a.staff === candidate && startMins < a.end_time && endMins > a.start_time)
+          || dayBlocks.some((b: any) => b.staff_name === candidate && blockOverlaps(b, startMins, endMins));
         if (!hasConflict) { assignedStaff = candidate; break; }
       }
       await supabase.from('appointments').insert({
@@ -251,7 +284,7 @@ if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
           )}
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={() => setStep(1)} style={{ flex: 1, padding: '16px', background: 'white', color: '#555', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>← 戻る</button>
-            <button onClick={() => { if (!form.workType) { alert('作業内容を選択してください'); return; } setStep(3); }} style={{ flex: 2, padding: '16px', background: bgGradient, color: 'white', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>次へ →</button>
+            <button onClick={() => { if (!form.workType) { alert('作業内容を選択してください'); return; } setStep(3); if (form.preferredDate) fetchAvailability(form.preferredDate); }} style={{ flex: 2, padding: '16px', background: bgGradient, color: 'white', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>次へ →</button>
           </div>
         </>)}
 
@@ -264,25 +297,34 @@ if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
               <label style={labelStyle}>希望時間 <span style={{ color: '#ef4444' }}>*</span></label>
               {slotLoading ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '13px' }}>空き状況を確認中...</div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                  {TIME_SLOTS.map(slot => {
-                    const status = slotStatus[slot] || 'available';
-                    const isSelected = form.preferredTime === slot;
-                    const isFull = status === 'full';
-                    return (
-                      <div key={slot} onClick={() => { if (!isFull) setForm({ ...form, preferredTime: slot }); }}
-                        style={{ padding: '12px 4px', borderRadius: '10px', textAlign: 'center', cursor: isFull ? 'not-allowed' : 'pointer',
-                          border: `2px solid ${isSelected ? '#6366f1' : isFull ? '#fecaca' : status === 'few' ? '#fed7aa' : '#e5e7eb'}`,
-                          background: isSelected ? '#f0f0ff' : isFull ? '#fef2f2' : 'white', opacity: isFull ? 0.6 : 1 }}>
-                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: isSelected ? '#6366f1' : isFull ? '#999' : '#333' }}>{slot}</div>
-                        <div style={{ fontSize: '16px', marginTop: '2px' }}>{isFull ? '×' : status === 'few' ? '△' : '○'}</div>
-                      </div>
-                    );
-                  })}
+              ) : dayClosedReason ? (
+                <div style={{ textAlign: 'center', padding: '24px 16px', background: '#f3f4f6', border: '2px solid #e5e7eb', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '28px', marginBottom: '6px' }}>🚫</div>
+                  <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#374151' }}>この日は{dayClosedReason}です</div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>お手数ですが、別の日をお選びください</div>
                 </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                    {TIME_SLOTS.map(slot => {
+                      const status = slotStatus[slot] || 'available';
+                      const isSelected = form.preferredTime === slot;
+                      const isClosed = status === 'closed';
+                      const isFull = status === 'full' || isClosed;
+                      return (
+                        <div key={slot} onClick={() => { if (!isFull) setForm({ ...form, preferredTime: slot }); }}
+                          style={{ padding: '12px 4px', borderRadius: '10px', textAlign: 'center', cursor: isFull ? 'not-allowed' : 'pointer',
+                            border: `2px solid ${isSelected ? '#6366f1' : isClosed ? '#e5e7eb' : isFull ? '#fecaca' : status === 'few' ? '#fed7aa' : '#e5e7eb'}`,
+                            background: isSelected ? '#f0f0ff' : isClosed ? '#f3f4f6' : isFull ? '#fef2f2' : 'white', opacity: isFull ? 0.6 : 1 }}>
+                          <div style={{ fontSize: '14px', fontWeight: 'bold', color: isSelected ? '#6366f1' : isFull ? '#999' : '#333' }}>{slot}</div>
+                          <div style={{ fontSize: isClosed ? '12px' : '16px', marginTop: '2px', color: isClosed ? '#9ca3af' : undefined, fontWeight: isClosed ? 'bold' : undefined }}>{isClosed ? '休' : status === 'full' ? '×' : status === 'few' ? '△' : '○'}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: '14px', marginTop: '10px', fontSize: '11px', color: '#888', justifyContent: 'center', flexWrap: 'wrap' }}><span>○ 空きあり</span><span>△ 残りわずか</span><span>× 満席</span><span>休 受付不可</span></div>
+                </>
               )}
-              <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '11px', color: '#888', justifyContent: 'center' }}><span>○ 空きあり</span><span>△ 残りわずか</span><span>× 満席</span></div>
             </div>
           )}
           <div style={{ marginBottom: '28px' }}><label style={labelStyle}>備考（任意）</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="ご要望や気になる点があればご記入ください" style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }} /></div>
