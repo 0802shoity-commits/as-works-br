@@ -1070,10 +1070,10 @@ return (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setIsModalOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: "540px", maxHeight: "90vh", overflowY: "auto", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)", animation: "catOpen 0.3s cubic-bezier(0.22, 1, 0.36, 1)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <span style={{ fontSize: "18px", fontWeight: "bold" }}>{blockForm.editingId ? "✏️ ブロックを編集" : "🚫 予約不可（ブロック）設定"}</span>
+              <span style={{ fontSize: "18px", fontWeight: "bold" }}>{blockForm.editingId ? " ブロックを編集" : " 予約不可（ブロック）設定"}</span>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 {!blockForm.editingId && (
-                  <span onClick={() => { setIsModalOpen(false); setIsBlockListOpen(true); }} style={{ fontSize: "12px", color: "#7d2ae8", fontWeight: "bold", cursor: "pointer", padding: "4px 10px", border: "2px solid #e9d5ff", borderRadius: "14px" }}>📋 設定済み（{blockedSlots.length}件）</span>
+                  <span onClick={() => { setIsModalOpen(false); setIsBlockListOpen(true); }} style={{ fontSize: "12px", color: "#7d2ae8", fontWeight: "bold", cursor: "pointer", padding: "4px 10px", border: "2px solid #e9d5ff", borderRadius: "14px" }}>設定済み（{blockedSlots.length}件）</span>
                 )}
                 <span onClick={() => setIsModalOpen(false)} style={{ cursor: "pointer", color: "#ccc", fontSize: "20px" }}>×</span>
               </div>
