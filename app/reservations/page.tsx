@@ -634,10 +634,76 @@ export default function ReservationsPage() {
             const taxRate = 0.10; const basePrice = 980; const tax = Math.floor(basePrice * taxRate); const total = basePrice + tax;
             const billingHistory = [];
             for (let i = 0; i < 6; i++) { const d = new Date(today.getFullYear(), today.getMonth() - i, 1); billingHistory.push({ month: `${d.getFullYear()}年${d.getMonth() + 1}月`, invoiceNo: `INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}-${userId?.slice(0, 6).toUpperCase()}`, date: `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/01`, amount: total }); }
+
+            // 明細書だけを専用ページで印刷（画面側の印刷設定の影響を受けない）
+            const printInvoice = () => {
+              const esc = (v: string) => String(v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[ch]);
+              const yen = (n: number) => `¥${n.toLocaleString()}`;
+              const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>請求明細書 ${esc(invoiceNo)}</title>
+<style>
+  @page { size: A4 portrait; margin: 16mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; color: #1a1a2e; margin: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1a1a2e; padding-bottom: 16px; margin-bottom: 28px; }
+  .title { font-size: 28px; font-weight: bold; letter-spacing: 3px; }
+  .sub { font-size: 12px; color: #888; margin-top: 4px; }
+  .grid { display: flex; justify-content: space-between; margin-bottom: 28px; }
+  .label { font-size: 11px; color: #999; font-weight: bold; letter-spacing: 1px; margin-bottom: 6px; }
+  .val { font-size: 13px; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th { background: #f3f4f6; font-size: 12px; color: #555; padding: 10px 14px; border-bottom: 2px solid #e5e7eb; text-align: left; }
+  td { padding: 14px; border-bottom: 1px solid #eee; font-size: 14px; }
+  .r { text-align: right; } .c { text-align: center; }
+  .totals { width: 280px; margin-left: auto; margin-bottom: 28px; }
+  .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; color: #555; }
+  .total { font-size: 18px; font-weight: bold; color: #1a1a2e; border-top: 2px solid #1a1a2e; margin-top: 6px; padding-top: 10px; }
+  .paid { display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 10px; margin-bottom: 28px; }
+  .note { font-size: 12px; color: #888; line-height: 1.8; border-top: 1px solid #eee; padding-top: 14px; }
+</style></head><body>
+  <div class="head">
+    <div><div class="title">請求明細書</div><div class="sub">INVOICE</div></div>
+    <div style="text-align:right"><div style="font-size:15px;font-weight:bold">As-Works</div><div class="sub">ビジネス管理システム</div></div>
+  </div>
+  <div class="grid">
+    <div><div class="label">ご請求先</div><div style="font-size:15px;font-weight:bold">${esc(billingEmail)}</div><div class="val" style="color:#666">ユーザーID: ${esc((userId || '').slice(0, 8))}...</div></div>
+    <div style="text-align:right"><div class="label">請求情報</div><div class="val">請求書番号: ${esc(invoiceNo)}</div><div class="val">発行日: ${esc(today.toLocaleDateString('ja-JP'))}</div><div class="val">対象期間: ${esc(currentMonth)}</div></div>
+  </div>
+  <table>
+    <thead><tr><th>項目</th><th class="c">数量</th><th class="r">単価</th><th class="r">金額</th></tr></thead>
+    <tbody><tr>
+      <td><b>As-Works プレミアムプラン（月額）</b><div style="font-size:12px;color:#888;margin-top:4px">顧客管理・WEB予約・台帳機能</div></td>
+      <td class="c">1</td><td class="r">${yen(basePrice)}</td><td class="r"><b>${yen(basePrice)}</b></td>
+    </tr></tbody>
+  </table>
+  <div class="totals">
+    <div class="row"><span>小計</span><span>${yen(basePrice)}</span></div>
+    <div class="row"><span>消費税（10%）</span><span>${yen(tax)}</span></div>
+    <div class="row total"><span>合計</span><span>${yen(total)}</span></div>
+  </div>
+  <div class="paid"><span style="font-size:20px">✅</span><div><div style="font-weight:bold;color:#059669">お支払い済み</div><div style="font-size:12px;color:#10b981">クレジットカードによる自動引き落とし</div></div></div>
+  <div class="note"><div style="font-weight:bold;margin-bottom:4px">備考</div>
+    <div>・本請求書は As-Works プレミアムプランの月額利用料に関するものです。</div>
+    <div>・消費税は税率10%で計算しています。</div>
+    <div>・サブスクリプションはいつでもキャンセル可能です。</div>
+    <div>・ご不明な点がございましたらメッセージ機能よりお問い合わせください。</div>
+  </div>
+</body></html>`;
+              const iframe = document.createElement('iframe');
+              iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0';
+              iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0';
+              document.body.appendChild(iframe);
+              const doc = iframe.contentWindow?.document;
+              if (!doc) { document.body.removeChild(iframe); return; }
+              doc.open(); doc.write(html); doc.close();
+              setTimeout(() => {
+                iframe.contentWindow?.focus();
+                iframe.contentWindow?.print();
+                setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe); }, 1000);
+              }, 300);
+            };
             return (
             <div>
-              <style>{`@media print { body * { visibility: hidden; } [data-billing-print], [data-billing-print] * { visibility: visible; } [data-billing-print] { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; } [data-no-print] { display: none !important; } }`}</style>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }} data-no-print><button onClick={() => window.print()} style={{ padding: '10px 20px', borderRadius: '10px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>🖨 明細書を印刷 / PDF保存</button></div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }} data-no-print><button onClick={printInvoice} style={{ padding: '10px 20px', borderRadius: '10px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>🖨 明細書を印刷 / PDF保存</button></div>
               <div data-billing-print style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', borderBottom: '3px solid #1a1a2e', paddingBottom: '20px' }}>
                   <div><div style={{ fontSize: '28px', fontWeight: 'bold', color: '#1a1a2e', letterSpacing: '3px' }}>請求明細書</div><div style={{ fontSize: '13px', color: '#888', marginTop: '4px' }}>INVOICE</div></div>
