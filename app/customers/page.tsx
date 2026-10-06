@@ -19,6 +19,9 @@ const AVATAR_GRADIENT = 'linear-gradient(135deg, #9ca3af, #6b7280)';
 
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
+// 最終来店からこの日数以上たったお客様を「休眠」とする
+const DORMANT_DAYS = 90;
+
 type CustomerAction = {
   id: string;
   customer_id: string;
@@ -72,6 +75,10 @@ function CustomersPage()  {
   const [showPastLogs, setShowPastLogs] = useState<{ [customerId: string]: boolean }>({});
   const [selectedActionCat, setSelectedActionCat] = useState<string>('');
   const [dateMode, setDateMode] = useState<'registered' | 'lastVisit'>('registered');
+  // 並び替え・表示切替・休眠フィルター
+  const [sortMode, setSortMode] = useState<'registered' | 'lastVisit' | 'visits' | 'name' | 'longAgo'>('registered');
+  const [displayMode, setDisplayMode] = useState<'card' | 'table'>('card');
+  const [dormantOnly, setDormantOnly] = useState(false);
 
   const bt = getBusinessType(businessType);
   const isCar = businessType === 'car';
@@ -154,6 +161,7 @@ function CustomersPage()  {
     if (!highlightId || customers.length === 0) return;
     const target = customers.find(c => String(c.id) === String(highlightId));
     if (target) {
+      setDisplayMode('card');
       setExpandedId(target.id);
       setTimeout(() => {
         const el = document.getElementById(`customer-${target.id}`);
@@ -256,6 +264,15 @@ function CustomersPage()  {
     return new Set(hist.map(h => h.work_type).filter(Boolean));
   };
 
+  // 来店回数・最終来店日・経過日数
+  const visitStats = (customer: any) => {
+    const hist = histories[customer.id] || [];
+    const dates = hist.map(h => h.work_date).filter(Boolean).sort();
+    const last: string | null = dates.length ? dates[dates.length - 1] : null;
+    const days = last ? Math.floor((Date.now() - new Date(`${last}T00:00:00`).getTime()) / 86400000) : null;
+    return { count: hist.length, last, days, dormant: days !== null && days >= DORMANT_DAYS };
+  };
+
   const getMonthCount = (month: number) => allHistory.filter(h => {
     if (!h.work_date) return false; const d = new Date(h.work_date);
     if (d.getFullYear() !== selectedYear || d.getMonth() !== month) return false;
@@ -280,8 +297,25 @@ function CustomersPage()  {
     if (searchQuery) { const q = searchQuery.toLowerCase(); if (!(c.name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.car_model?.toLowerCase().includes(q) || c.car_number?.toLowerCase().includes(q))) return false; }
     if (activeCategory !== 'all') { if (!getCustomerCategory(c.id).has(activeCategory)) return false; }
     if (activeItem) { const hist = histories[c.id] || []; if (!hist.some(h => h.work_type === activeItem)) return false; }
+    if (dormantOnly && !visitStats(c).dormant) return false;
     return true;
   });
+
+  // 並び替え
+  const sorted = [...filtered].sort((a, b) => {
+    const sa = visitStats(a), sb = visitStats(b);
+    switch (sortMode) {
+      case 'name': return (a.name || '').localeCompare(b.name || '', 'ja');
+      case 'visits': return sb.count - sa.count;
+      case 'lastVisit': return (sb.last || '').localeCompare(sa.last || '');
+      case 'longAgo': return (sb.days ?? -1) - (sa.days ?? -1);
+      default: return (b.created_at || '').localeCompare(a.created_at || '');
+    }
+  });
+
+  const dormantCount = customers.filter(c => visitStats(c).dormant).length;
+  const thisMonth = new Date().toLocaleDateString('sv-SE').slice(0, 7);
+  const newThisMonth = customers.filter(c => c.created_at && new Date(c.created_at).toLocaleDateString('sv-SE').startsWith(thisMonth)).length;
 
   const getCategoryCount = (catKey: string) => catKey === 'all' ? customers.length : customers.filter(c => getCustomerCategory(c.id).has(catKey)).length;
 
@@ -290,6 +324,36 @@ function CustomersPage()  {
     const cf = customer.custom_fields || {};
     const firstTextField = bt.fields.find(f => f.type === 'text');
     return firstTextField ? (cf[firstTextField.key] || '') : '';
+  };
+
+  // CSV出力（今表示中のお客様）
+  const exportCsv = () => {
+    const extraFields = isCar ? [] : bt.fields.filter((f: any) => f.type !== 'textarea');
+    const header = ['名前', '電話番号', '住所',
+      ...(isCar ? ['車種', 'ナンバー', '車検満了日'] : extraFields.map((f: any) => f.label)),
+      '登録日', '来店回数', '最終来店日', '最終来店からの日数', '状態'];
+    const rows = sorted.map(c => {
+      const s = visitStats(c);
+      const cf = c.custom_fields || {};
+      const status = [cf.is_blacklist ? 'ブラックリスト' : '', s.dormant ? '休眠' : '', s.count === 0 ? '未来店' : ''].filter(Boolean).join('・');
+      return [c.name || '', c.phone || '', c.address || '',
+        ...(isCar ? [c.car_model || '', c.car_number || '', c.inspection_date || ''] : extraFields.map((f: any) => cf[f.key] || '')),
+        c.created_at ? new Date(c.created_at).toLocaleDateString('sv-SE') : '',
+        String(s.count), s.last || '', s.days === null ? '' : String(s.days), status];
+    });
+    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `顧客台帳_${new Date().toLocaleDateString('sv-SE')}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const openFromTable = (customer: any) => {
+    setDisplayMode('card');
+    setExpandedId(customer.id);
+    setTimeout(() => document.getElementById(`customer-${customer.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
   };
 
   const isPremium = userPlan === 'premium';
@@ -373,6 +437,21 @@ function CustomersPage()  {
     }
   };
 
+  // 来店状況バッジ
+  const renderVisitBadges = (customer: any) => {
+    const s = visitStats(customer);
+    const badge = (text: string, color: string, bg: string) => (
+      <span style={{ fontSize: '11px', fontWeight: 'bold', color, background: bg, padding: '3px 10px', borderRadius: '8px', whiteSpace: 'nowrap' }}>{text}</span>
+    );
+    return (
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {s.count === 0 ? badge('未来店', '#6b7280', '#f3f4f6') : badge(`来店 ${s.count}回`, '#4f46e5', '#eef2ff')}
+        {s.days !== null && badge(s.days === 0 ? '本日来店' : `最終来店 ${s.days}日前`, s.dormant ? '#b45309' : '#047857', s.dormant ? '#fef3c7' : '#ecfdf5')}
+        {s.dormant && badge('😴 休眠', '#dc2626', '#fee2e2')}
+      </div>
+    );
+  };
+
  const renderCustomerCard = (customer: any) => {
     const isExpanded = expandedId === customer.id;
     const isHover = hoverId === customer.id;
@@ -412,7 +491,7 @@ function CustomersPage()  {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
               <div style={{ fontSize: '20px', fontWeight: 'bold', color: isBlack ? '#dc2626' : '#1a1a2e', flexShrink: 0 }}>{customer.name}</div>
               {isBlack && <span style={{ fontSize: '11px', fontWeight: 'bold', background: '#ef4444', color: 'white', padding: '2px 10px', borderRadius: '6px', flexShrink: 0 }}>BL</span>}
-              {action && <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', background: '#fef3c7', color: '#b45309', flexShrink: 0 }}></span>}
+              {action && <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', background: '#fef3c7', color: '#b45309', flexShrink: 0 }}>🔔 {action.action_type}</span>}
               <span style={{ fontSize: '14px', color: '#6b7280', flexShrink: 0 }}>{customer.phone || ''}</span>
             </div>
             <div style={{ flex: 1 }} />
@@ -436,12 +515,12 @@ function CustomersPage()  {
             })()}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <button onClick={(e) => { e.stopPropagation(); router.push(`/customer-register?edit=${customer.id}`); }} style={{ padding: '5px 12px', borderRadius: '8px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}> 編集</button>
-              {history.length > 0 && <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', background: '#e8f5e9', color: '#047857' }}>履歴 {history.length}件</span>}
               <span style={{ fontSize: '14px', color: '#c0c4d0', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {renderVisitBadges(customer)}
               {customer.address && <span style={{ fontSize: '13px', color: '#6b7280' }}>{customer.address}</span>}
             </div>
             {isCar && inspStatus && (
@@ -508,7 +587,7 @@ function CustomersPage()  {
               <div style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '2px solid #fcd34d', borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (actionLogs[action.id]?.length > 0) ? '10px' : '0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '20px' }}></span>
+                    <span style={{ fontSize: '20px' }}>🔔</span>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#92400e' }}>{action.action_type}</div>
                       <div style={{ fontSize: '12px', color: '#b45309' }}>{action.scheduled_date || '期日未定'}{action.notes && ` ・${action.notes}`}</div>
@@ -811,7 +890,7 @@ function CustomersPage()  {
       )}
 
 
-      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
+      <div style={{ maxWidth: displayMode === 'table' ? '1200px' : '900px', margin: '0 auto', padding: '24px 20px', transition: 'max-width 0.2s' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
           {dynamicCategories.map(cat => (
             <button key={cat.key} onClick={() => { setActiveCategory(cat.key); setActiveItem(null); setSelectedMonth(null); }} style={{ padding: '10px 18px', borderRadius: '14px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap', background: activeCategory === cat.key ? cat.gradient : 'white', color: activeCategory === cat.key ? 'white' : '#555', boxShadow: activeCategory === cat.key ? `0 6px 16px ${cat.color}45` : '0 2px 8px rgba(0,0,0,0.06)', transition: 'all 0.2s' }}>{cat.icon} {cat.label} ({getCategoryCount(cat.key)})</button>
@@ -868,10 +947,39 @@ function CustomersPage()  {
 
         {viewMode === 'list' && (
           <>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <button onClick={() => setDateMode('registered')} style={{ padding: '6px 14px', borderRadius: '10px', border: 'none', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', background: dateMode === 'registered' ? '#6366f1' : 'white', color: dateMode === 'registered' ? 'white' : '#555', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>📅 登録日</button>
-              <button onClick={() => setDateMode('lastVisit')} style={{ padding: '6px 14px', borderRadius: '10px', border: 'none', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', background: dateMode === 'lastVisit' ? '#10b981' : 'white', color: dateMode === 'lastVisit' ? 'white' : '#555', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>🔧 最終来店日</button>
+            {/* サマリー */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              {[
+                { label: '顧客総数', value: customers.length, color: '#374151', bg: 'white', onClick: () => setDormantOnly(false), active: false },
+                { label: '今月の新規', value: newThisMonth, color: '#6366f1', bg: '#eef2ff', onClick: () => setSortMode('registered'), active: false },
+                { label: `休眠（${DORMANT_DAYS}日以上来店なし）`, value: dormantCount, color: '#dc2626', bg: '#fee2e2', onClick: () => setDormantOnly(!dormantOnly), active: dormantOnly },
+              ].map(s => (
+                <div key={s.label} onClick={s.onClick} style={{ padding: '10px 16px', borderRadius: '12px', background: s.bg, boxShadow: s.active ? `0 0 0 2px ${s.color}` : '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer', minWidth: '120px', transition: '0.15s' }}>
+                  <div style={{ fontSize: '11px', color: '#888', fontWeight: 'bold' }}>{s.label}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: s.color }}>{s.value}<span style={{ fontSize: '11px', color: '#999', fontWeight: 'normal' }}>人</span></div>
+                </div>
+              ))}
             </div>
+
+            {/* ツールバー */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <select value={sortMode} onChange={e => setSortMode(e.target.value as any)} style={{ padding: '8px 12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', fontSize: '12px', fontWeight: 'bold', color: '#374151', cursor: 'pointer', outline: 'none' }}>
+                <option value="registered">📅 登録日が新しい順</option>
+                <option value="lastVisit">🔧 最終来店が新しい順</option>
+                <option value="visits">🔁 来店回数が多い順</option>
+                <option value="longAgo">⏳ 来店が遠い順</option>
+                <option value="name">🔤 名前順</option>
+              </select>
+              <button onClick={() => setDormantOnly(!dormantOnly)} style={{ padding: '7px 14px', borderRadius: '10px', border: `2px solid ${dormantOnly ? '#dc2626' : '#e5e7eb'}`, background: dormantOnly ? '#fee2e2' : 'white', color: dormantOnly ? '#dc2626' : '#555', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>😴 休眠客のみ（{dormantCount}）</button>
+              <div style={{ flex: 1 }} />
+              <div style={{ display: 'flex', background: '#e9ebf3', borderRadius: '10px', padding: '3px' }}>
+                {([['card', '🗂 カード'], ['table', '📋 一覧表']] as const).map(([m, label]) => (
+                  <div key={m} onClick={() => setDisplayMode(m)} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', background: displayMode === m ? 'white' : 'transparent', color: displayMode === m ? '#4f46e5' : '#888', boxShadow: displayMode === m ? '0 1px 4px rgba(0,0,0,0.1)' : 'none' }}>{label}</div>
+                ))}
+              </div>
+              <button onClick={exportCsv} style={{ padding: '7px 14px', borderRadius: '10px', border: '2px solid #059669', background: 'white', color: '#059669', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>⬇ CSV</button>
+            </div>
+
             <input
               type="text"
               value={searchQuery}
@@ -881,9 +989,51 @@ function CustomersPage()  {
               placeholder={isCar ? "🔍 名前・電話番号・車種・ナンバーで検索..." : "🔍 名前・電話番号で検索..."}
               style={{ width: '100%', padding: '14px 18px', border: `2px solid ${searchFocused ? '#6366f1' : '#e5e7eb'}`, borderRadius: '14px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '20px', outline: 'none', boxShadow: searchFocused ? '0 0 0 4px rgba(99,102,241,0.12)' : 'none', transition: 'all 0.2s', background: 'white' }}
             />
-            {filtered.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '18px' }}><div style={{ fontSize: '48px', marginBottom: '12px' }}>👤</div><div style={{ color: '#999', fontSize: '14px' }}>{searchQuery ? '検索結果がありません' : '顧客が登録されていません'}</div></div>
-            ) : (filtered.map(customer => renderCustomerCard(customer)))}
+            {sorted.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '18px' }}><div style={{ fontSize: '48px', marginBottom: '12px' }}>👤</div><div style={{ color: '#999', fontSize: '14px' }}>{searchQuery || dormantOnly ? '該当するお客様がいません' : '顧客が登録されていません'}</div></div>
+            ) : displayMode === 'card' ? (
+              sorted.map(customer => renderCustomerCard(customer))
+            ) : (
+              <div style={{ background: 'white', borderRadius: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#1a1a2e', color: 'white' }}>
+                      {['名前', '電話番号', isCar ? '車種・ナンバー' : (bt.fields.find((f: any) => f.type === 'text')?.label || '情報'), '来店', '最終来店', '登録日', '状態'].map(h => (
+                        <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map((c, i) => {
+                      const s = visitStats(c);
+                      const cf = c.custom_fields || {};
+                      const isBlack = cf.is_blacklist === true;
+                      const action = customerActions[c.id];
+                      return (
+                        <tr key={c.id} onClick={() => openFromTable(c)} style={{ background: isBlack ? '#fef2f2' : i % 2 === 0 ? 'white' : '#fafbfc', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#eef2ff'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isBlack ? '#fef2f2' : i % 2 === 0 ? 'white' : '#fafbfc'}>
+                          <td style={{ padding: '10px 12px', fontWeight: 'bold', color: isBlack ? '#dc2626' : '#1a1a2e', whiteSpace: 'nowrap' }}>{c.name}</td>
+                          <td style={{ padding: '10px 12px', color: '#555', whiteSpace: 'nowrap' }}>{c.phone || '—'}</td>
+                          <td style={{ padding: '10px 12px', color: '#555', whiteSpace: 'nowrap' }}>{isCar ? `${c.car_model || '—'}${c.car_number ? `・${c.car_number}` : ''}` : (getCustomerSubInfo(c) || '—')}</td>
+                          <td style={{ padding: '10px 12px', fontWeight: 'bold', color: s.count ? '#4f46e5' : '#bbb', whiteSpace: 'nowrap' }}>{s.count}回</td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: s.dormant ? '#b45309' : '#555' }}>{s.last ? <>{s.last}<span style={{ fontSize: '11px', color: '#999' }}>（{s.days}日前）</span></> : '—'}</td>
+                          <td style={{ padding: '10px 12px', color: '#888', whiteSpace: 'nowrap' }}>{c.created_at ? new Date(c.created_at).toLocaleDateString('sv-SE') : '—'}</td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              {isBlack && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#ef4444', color: 'white', padding: '2px 8px', borderRadius: '6px' }}>BL</span>}
+                              {s.dormant && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '6px' }}>休眠</span>}
+                              {s.count === 0 && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#f3f4f6', color: '#6b7280', padding: '2px 8px', borderRadius: '6px' }}>未来店</span>}
+                              {action && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '6px' }}>🔔</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>

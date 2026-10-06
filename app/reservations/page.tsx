@@ -5,6 +5,7 @@ import { createClient } from '../lib/supabase';
 import { BUSINESS_TYPES, getBusinessType } from '../lib/businessTypes';
 import UpgradeModal from "../components/UpgradeModal";
 import ShiftManager from "../components/ShiftManager";
+import CustomerCalendar from "../components/CustomerCalendar";
 
 type CustomerAction = {
   id: string;
@@ -29,6 +30,7 @@ export default function ReservationsPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [userId, setUserId] = useState<string>("");
+  const [customerHighlight, setCustomerHighlight] = useState<string | null>(null);
 
   const [actions, setActions] = useState<CustomerAction[]>([]);
   const [actionsLoading, setActionsLoading] = useState(false);
@@ -275,6 +277,7 @@ export default function ReservationsPage() {
     { key: 'reservations', icon: '📋', label: '予約一覧' },
     { key: 'register', icon: '✏️', label: '顧客登録' },
     { key: 'customers', icon: '👤', label: '顧客台帳' },
+    { key: 'customerCalendar', icon: '🗓', label: '顧客カレンダー' },
     ...(businessType === 'car' ? [{ key: 'inspection', icon: '🚗', label: '車検満了日' }] : []),
     { key: 'shifts', icon: '📅', label: 'シフト管理' },
     { key: 'message', icon: '💬', label: 'メッセージ' },
@@ -347,7 +350,7 @@ export default function ReservationsPage() {
           <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', padding: '8px 16px', fontWeight: '600', letterSpacing: '1px' }}>MENU</div>
           {menuItems.map(item => (
             <div key={item.key} onClick={() => {
-              setActiveMenu(item.key); setSearchQuery('');
+              setActiveMenu(item.key); setSearchQuery(''); setCustomerHighlight(null);
             }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', cursor: 'pointer', background: activeMenu === item.key ? 'rgba(255,255,255,0.15)' : 'transparent', borderLeft: activeMenu === item.key ? '3px solid #6366f1' : '3px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { if (activeMenu !== item.key) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
             onMouseLeave={e => { if (activeMenu !== item.key) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
@@ -862,10 +865,15 @@ export default function ReservationsPage() {
           {activeMenu === 'register' && !searchQuery && (<iframe src="/customer-register" style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />)}
 
           {/* 顧客台帳 */}
-          {activeMenu === 'customers' && !searchQuery && (<iframe src="/customers" style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />)}
+          {activeMenu === 'customers' && !searchQuery && (<iframe key={customerHighlight || 'all'} src={customerHighlight ? `/customers?highlight=${customerHighlight}` : "/customers"} style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />)}
+
+          {/* 顧客カレンダー */}
+          {activeMenu === 'customerCalendar' && !searchQuery && (
+            <CustomerCalendar onOpenCustomer={(id) => { setCustomerHighlight(id); setActiveMenu('customers'); }} />
+          )}
 
           {/* 準備中 */}
-          {!searchQuery && !['reservations', 'stats', 'actions', 'message', 'billing', 'settings', 'inspection', 'shifts', 'register', 'customers'].includes(activeMenu) && (
+          {!searchQuery && !['reservations', 'stats', 'actions', 'message', 'billing', 'settings', 'inspection', 'shifts', 'register', 'customers', 'customerCalendar'].includes(activeMenu) && (
             <div style={{ textAlign: 'center', padding: '80px', background: 'white', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>{menuItems.find(m => m.key === activeMenu)?.icon}</div>
               <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>{menuItems.find(m => m.key === activeMenu)?.label}</div>
