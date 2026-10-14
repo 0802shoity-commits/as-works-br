@@ -21,23 +21,23 @@ const COLOR_PALETTE = [
 
 const INITIAL_WORK_CATEGORIES = [
   {
-    category: "カテゴリー1", color: "#c8e6c9", borderColor: "#4caf50",
+    category: "Categoria 1", color: "#c8e6c9", borderColor: "#4caf50",
     items: []
   },
   {
-    category: "カテゴリー2", color: "#f8bbd0", borderColor: "#e91e63",
+    category: "Categoria 2", color: "#f8bbd0", borderColor: "#e91e63",
     items: []
   },
   {
-    category: "カテゴリー3", color: "#e0f7fa", borderColor: "#4dd0e1",
+    category: "Categoria 3", color: "#e0f7fa", borderColor: "#4dd0e1",
     items: [
-      { title: "項目1", color: "#e0f7fa", borderColor: "#4dd0e1", duration: 45 },
-      { title: "項目2", color: "#b2ebf2", borderColor: "#26c6da", duration: 30 },
+      { title: "Item 1", color: "#e0f7fa", borderColor: "#4dd0e1", duration: 45 },
+      { title: "Item 2", color: "#b2ebf2", borderColor: "#26c6da", duration: 30 },
     ]
   },
 ];
 
-const DAYS_OF_WEEK = ["日", "月", "火", "水", "木", "金", "土"];
+const DAYS_OF_WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 const HOLIDAYS_2026 = [
   "2026-01-01", "2026-01-12", "2026-02-11", "2026-02-23", "2026-03-20",
@@ -46,17 +46,17 @@ const HOLIDAYS_2026 = [
   "2026-10-12", "2026-11-03", "2026-11-23", "2026-12-23"
 ];
 
-// ===== 一括ブロック =====
+// ===== Bloqueios =====
 type BlockSlot = {
   id: number; reason: string; allDay: boolean; start: number; end: number;
   mode: 'range' | 'dates' | 'weekly'; startDate: string | null; endDate: string | null;
   days: number[]; specificDates: string[]; staffName: string | null; excludedDates: string[];
 };
 
-const BLOCK_REASONS = ["定休日", "臨時休業", "研修", "休憩"];
+const BLOCK_REASONS = ["Folga semanal", "Fechamento temporário", "Treinamento", "Intervalo"];
 
 const blockFromRow = (r: any): BlockSlot => ({
-  id: r.id, reason: r.reason || "休業", allDay: !!r.all_day,
+  id: r.id, reason: r.reason || "Fechado", allDay: !!r.all_day,
   start: r.start_time ?? 0, end: r.end_time ?? 0,
   mode: (r.mode || "range") as BlockSlot['mode'],
   startDate: r.start_date || null, endDate: r.end_date || null,
@@ -81,13 +81,13 @@ const blockAppliesOn = (b: BlockSlot, dateStr: string) => {
 const fmtMins = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 const describeBlock = (b: BlockSlot) => {
-  const dayNames = [...b.days].sort().map(d => DAYS_OF_WEEK[d]).join("・");
+  const dayNames = [...b.days].sort().map(d => DAYS_OF_WEEK[d]).join(", ");
   let when = "";
-  if (b.mode === "weekly") when = `毎週 ${dayNames}曜`;
-  else if (b.mode === "dates") when = b.specificDates.length > 3 ? `${b.specificDates.slice(0, 3).join(", ")} 他${b.specificDates.length - 3}日` : b.specificDates.join(", ");
+  if (b.mode === "weekly") when = `Toda semana: ${dayNames}`;
+  else if (b.mode === "dates") when = b.specificDates.length > 3 ? `${b.specificDates.slice(0, 3).join(", ")} e mais ${b.specificDates.length - 3} dias` : b.specificDates.join(", ");
   else when = `${b.startDate} 〜 ${b.endDate}${dayNames ? `（${dayNames}）` : ""}`;
-  const time = b.allDay ? "終日" : `${fmtMins(b.start)}〜${fmtMins(b.end)}`;
-  return `${when}　${time}　${b.staffName ? `${b.staffName}のみ` : "全員"}`;
+  const time = b.allDay ? "Dia inteiro" : `${fmtMins(b.start)}〜${fmtMins(b.end)}`;
+  return `${when}　${time}　${b.staffName ? `somente ${b.staffName}` : "Todos"}`;
 };
 
 export default function ReservationPage() {
@@ -122,7 +122,7 @@ const [userEmail, setUserEmail] = useState('');
     mode: "range" as BlockSlot['mode'],
     startDate: dateStr, endDate: dateStr,
     specificDates: [] as string[], startTime: "12:00", endTime: "13:00", selectedDays: [] as number[],
-    allDay: false, reason: "定休日", staffName: "",
+    allDay: false, reason: "Folga semanal", staffName: "",
   });
   const [currentViewDate, setCurrentViewDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -198,7 +198,7 @@ const [userEmail, setUserEmail] = useState('');
     const remainingSlots = Math.max(0, bookingSlots - attending.length);
     const slotRows: string[] = [];
     for (let i = 0; i < remainingSlots; i++) {
-      slotRows.push(`予約枠${i + 1}`);
+      slotRows.push(`Vaga ${i + 1}`);
     }
     const dayApps = appointments.filter(a => a.date === selectedDate);
     const unassigned = dayApps.filter(a => !attending.includes(a.staff) && !slotRows.includes(a.staff));
@@ -206,7 +206,7 @@ const [userEmail, setUserEmail] = useState('');
     return [...attending, ...slotRows, ...extraStaff];
   }, [attendance, selectedDate, appointments, bookingSlots]);
 
-  // 出勤人数に合わせて、全員が画面に収まる行の高さを計算
+  // Presente人数に合わせて、Todosが画面に収まる行の高さを計算
   const ROW_HEIGHT = useMemo(() => {
     const max = settings.isCompact ? 45 : 80;
     const min = settings.isCompact ? 32 : 50;
@@ -267,7 +267,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
         })));
       }
 
-      // 一括ブロックを読み込み
+      // Bloqueiosを読み込み
       const { data: blockData } = await supabase.from('blocked_slots').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
       if (blockData) setBlockedSlots(blockData.map(blockFromRow));
     };
@@ -308,8 +308,8 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
       if (actionsData) {
         actionsData.forEach((a: any) => {
           const diff = Math.floor((new Date(a.scheduled_date).getTime() - new Date(todayStr2).getTime()) / (1000 * 60 * 60 * 24));
-          const label = diff < 0 ? '期限切れ' : diff === 0 ? '本日' : `あと${diff}日`;
-          notifs.push({ id: `action-${a.id}`, type: 'action', rawId: a.customer_id, title: `🔔 ${a.customer_name}様：${a.action_type}`, subtitle: `${a.scheduled_date}（${label}）` });
+          const label = diff < 0 ? 'Vencido' : diff === 0 ? 'Hoje' : `faltam ${diff} dias`;
+          notifs.push({ id: `action-${a.id}`, type: 'action', rawId: a.customer_id, title: `🔔 ${a.customer_name}: ${a.action_type}`, subtitle: `${a.scheduled_date}（${label}）` });
         });
       }
 
@@ -445,12 +445,12 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
 
   const filteredBlocks = useMemo(() => blockedSlots.filter(b => blockAppliesOn(b, selectedDate)), [blockedSlots, selectedDate]);
 
-  // 終日ブロックはタイムラインの端から端まで
+  // Dia inteiroBloqueioはタイムラインの端から端まで
   const blockRange = (b: BlockSlot) => b.allDay
     ? { start: settings.startHour * 60, end: (settings.startHour + totalHours) * 60 }
     : { start: b.start, end: b.end };
 
-  // カレンダー用：その日のブロック状態（closed=全員終日休み / partial=一部ブロック）
+  // カレンダー用：その日のBloqueio状態（closed=TodosDia inteiroFolga / partial=一部Bloqueio）
   const getDayBlockState = (dayStr: string | null) => {
     if (!dayStr) return null;
     const bs = blockedSlots.filter(b => blockAppliesOn(b, dayStr));
@@ -480,7 +480,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
   };
 
   const addStaff = async () => {
-    const name = window.prompt("スタッフ名を入力:");
+    const name = window.prompt("Nome do profissional:");
     if (name?.trim() && userId) {
       await supabase.from('staff_members').insert({ user_id: userId, name: name.trim() });
       setAllStaff(prev => [...prev, name.trim()]);
@@ -488,7 +488,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
   };
 
   const removeStaffFromAll = async (name: string) => {
-    if (window.confirm(`${name}さんをスタッフ一覧から削除しますか？`) && userId) {
+    if (window.confirm(`${name} será removido(a) da equipe. Confirmar?`) && userId) {
       await supabase.from('staff_members').delete().eq('user_id', userId).eq('name', name);
       await supabase.from('staff_attendance').delete().eq('user_id', userId).eq('staff_name', name);
       setAllStaff(prev => prev.filter(s => s !== name));
@@ -525,10 +525,10 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
   };
 
   const sendFeedback = async () => {
-    if (!feedbackTitle.trim() || !feedbackContent.trim()) { alert('タイトルと内容を入力してください'); return; }
+    if (!feedbackTitle.trim() || !feedbackContent.trim()) { alert('Preencha o título e o conteúdo'); return; }
     setFeedbackSending(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const typeLabel = { bug: '🐛 不具合報告', feature: '🆕 機能の要望', other: '💬 その他' }[feedbackType];
+    const typeLabel = { bug: '🐛 Relatar problema', feature: '🆕 Sugerir recurso', other: '💬 Outros' }[feedbackType];
     await supabase.from('feedback_messages').insert({
       user_id: user?.id,
       type: feedbackType,
@@ -542,11 +542,11 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
         body: JSON.stringify({
           access_key: '1082f8d3-5a20-45fd-b0bf-8c196e30b778',
           subject: `[As-Works] ${typeLabel}: ${feedbackTitle}`,
-          from_name: 'As-Works 通知',
-          送信者: user?.email || '不明',
-          種類: typeLabel,
-          タイトル: feedbackTitle,
-          内容: feedbackContent,
+          from_name: 'As-Works Notificação',
+          remetente: user?.email || 'desconhecido',
+          tipo: typeLabel,
+          titulo: feedbackTitle,
+          conteudo: feedbackContent,
         }),
       });
     } catch (e) {}
@@ -565,16 +565,16 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
 
   const saveAddItem = () => {
     if (addItemForm.mode === "new") {
-      if (!addItemForm.categoryName.trim() || !addItemForm.itemName.trim()) { alert("カテゴリー名と項目名を入力してください"); return; }
+      if (!addItemForm.categoryName.trim() || !addItemForm.itemName.trim()) { alert("Informe o nome da categoria e do item"); return; }
       setWorkCategories(prev => [...prev, { category: addItemForm.categoryName.trim(), color: tempBgColor, borderColor: tempBorderColor, items: [{ title: addItemForm.itemName.trim(), color: tempBgColor, borderColor: tempBorderColor, duration: addItemForm.duration }] }]);
     } else {
-      if (!addItemForm.itemName.trim()) { alert("項目名を入力してください"); return; }
+      if (!addItemForm.itemName.trim()) { alert("Informe o nome do item"); return; }
       setWorkCategories(prev => prev.map(cat => cat.category === addItemForm.categoryName ? { ...cat, items: [...cat.items, { title: addItemForm.itemName.trim(), color: tempBgColor, borderColor: tempBorderColor, duration: addItemForm.duration }] } : cat));
     }
     setIsAddItemModalOpen(false);
   };
 
-  // ===== 一括ブロック：作成・編集・解除・削除 =====
+  // ===== Bloqueios：作成・Editar・解除・Excluir =====
   const openNewBlock = () => {
     setBlockForm(emptyBlockForm(selectedDate));
     setIsModalOpen(true);
@@ -586,13 +586,13 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
     const [sH, sM] = f.startTime.split(":").map(Number);
     const [eH, eM] = f.endTime.split(":").map(Number);
     const start = sH * 60 + sM, end = eH * 60 + eM;
-    if (f.mode === "range" && f.startDate > f.endDate) { alert("終了日は開始日以降にしてください"); return; }
-    if (f.mode === "dates" && f.specificDates.length === 0) { alert("日付を1つ以上選んでください"); return; }
-    if (f.mode === "weekly" && f.selectedDays.length === 0) { alert("曜日を1つ以上選んでください"); return; }
-    if (!f.allDay && start >= end) { alert("終了時刻は開始時刻より後にしてください"); return; }
+    if (f.mode === "range" && f.startDate > f.endDate) { alert("A data final deve ser igual ou posterior à inicial"); return; }
+    if (f.mode === "dates" && f.specificDates.length === 0) { alert("Escolha pelo menos uma data"); return; }
+    if (f.mode === "weekly" && f.selectedDays.length === 0) { alert("Escolha pelo menos um dia da semana"); return; }
+    if (!f.allDay && start >= end) { alert("O horário final deve ser depois do inicial"); return; }
     const row = {
       user_id: userId,
-      reason: f.reason.trim() || "休業",
+      reason: f.reason.trim() || "Fechado",
       all_day: f.allDay,
       start_time: f.allDay ? null : start,
       end_time: f.allDay ? null : end,
@@ -605,11 +605,11 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
     };
     if (f.editingId) {
       const { data, error } = await supabase.from('blocked_slots').update(row).eq('id', f.editingId).select().single();
-      if (error || !data) { alert('保存に失敗しました: ' + (error?.message || '')); return; }
+      if (error || !data) { alert('Falha ao salvar: ' + (error?.message || '')); return; }
       setBlockedSlots(prev => prev.map(b => b.id === f.editingId ? blockFromRow(data) : b));
     } else {
       const { data, error } = await supabase.from('blocked_slots').insert(row).select().single();
-      if (error || !data) { alert('保存に失敗しました: ' + (error?.message || '')); return; }
+      if (error || !data) { alert('Falha ao salvar: ' + (error?.message || '')); return; }
       setBlockedSlots(prev => [...prev, blockFromRow(data)]);
     }
     setIsModalOpen(false);
@@ -630,15 +630,15 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
   const excludeBlockDate = async (b: BlockSlot, date: string) => {
     const next = [...b.excludedDates, date];
     const { error } = await supabase.from('blocked_slots').update({ excluded_dates: next }).eq('id', b.id);
-    if (error) { alert('解除に失敗しました: ' + error.message); return; }
+    if (error) { alert('Falha ao liberar: ' + error.message); return; }
     setBlockedSlots(prev => prev.map(x => x.id === b.id ? { ...x, excludedDates: next } : x));
     setBlockMenu(null);
   };
 
   const deleteBlock = async (b: BlockSlot) => {
-    if (!window.confirm(`「${b.reason}」のブロック設定をすべて削除しますか？\n\n${describeBlock(b)}`)) return;
+    if (!window.confirm(`Excluir todos os bloqueios "${b.reason}"?\n\n${describeBlock(b)}`)) return;
     const { error } = await supabase.from('blocked_slots').delete().eq('id', b.id);
-    if (error) { alert('削除に失敗しました: ' + error.message); return; }
+    if (error) { alert('Falha ao excluir: ' + error.message); return; }
     setBlockedSlots(prev => prev.filter(x => x.id !== b.id));
     setBlockMenu(null);
   };
@@ -671,10 +671,10 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
     return (
       <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "4px" }}>
         <select value={h} onChange={e => onChange(`${pad(Number(e.target.value))}:${pad(m)}`)} style={sel}>
-          {hours.map(x => <option key={x} value={x}>{x}時</option>)}
+          {hours.map(x => <option key={x} value={x}>{x}h</option>)}
         </select>
         <select value={m} onChange={e => onChange(`${pad(h)}:${pad(Number(e.target.value))}`)} style={sel}>
-          {mins.map(x => <option key={x} value={x}>{pad(x)}分</option>)}
+          {mins.map(x => <option key={x} value={x}>{pad(x)} min</option>)}
         </select>
       </div>
     );
@@ -696,7 +696,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
   };
 
   const deleteAppointment = async () => {
-    if (window.confirm("この予約を削除しますか？") && userId) { await supabase.from('appointments').delete().eq('id', selectedAppointment.id); setAppointments(prev => prev.filter(app => app.id !== selectedAppointment.id)); setSelectedAppointment(null); }
+    if (window.confirm("Excluir este agendamento?") && userId) { await supabase.from('appointments').delete().eq('id', selectedAppointment.id); setAppointments(prev => prev.filter(app => app.id !== selectedAppointment.id)); setSelectedAppointment(null); }
   };
 
   const getTimeFromX = useCallback((clientX: number) => {
@@ -735,21 +735,21 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
 
   const handleMouseUp = async () => {
     setPressedType(null);
-    // リサイズ終了 → 終了時刻を保存
+    // リサイズFim → Fim時刻をSalvar
     if (resizingAppId !== null) {
       const resized = appointments.find(a => a.id === resizingAppId);
       setResizingAppId(null);
       if (resized && userId) await supabase.from('appointments').update({ end_time: resized.end }).eq('id', resized.id);
       return;
     }
-    // 移動終了 → 開始・終了時刻とスタッフを保存
+    // 移動Fim → Início・Fim時刻とProfissionalをSalvar
     if (activeAction?.type === "move" && isDragStarted && !isOverTrash && userId) {
       const moved = appointments.find(a => a.id === activeAction.id);
       if (moved) await supabase.from('appointments').update({ start_time: moved.start, end_time: moved.end, staff: moved.staff }).eq('id', moved.id);
     }
     if (isOverTrash) {
       if (activeAction && userId) { await supabase.from('appointments').delete().eq('id', activeAction.id); setAppointments(prev => prev.filter(app => app.id !== activeAction.id)); }
-      if (draggingCategoryItem) { if (window.confirm(`「${draggingCategoryItem.itemTitle}」を削除しますか？`)) { setWorkCategories(prev => prev.map(cat => cat.category === draggingCategoryItem.categoryName ? { ...cat, items: cat.items.filter(item => item.title !== draggingCategoryItem.itemTitle) } : cat)); } }
+      if (draggingCategoryItem) { if (window.confirm(`Excluir "${draggingCategoryItem.itemTitle}"?`)) { setWorkCategories(prev => prev.map(cat => cat.category === draggingCategoryItem.categoryName ? { ...cat, items: cat.items.filter(item => item.title !== draggingCategoryItem.itemTitle) } : cat)); } }
       setActiveAction(null); setDraggingNewType(null); setDraggingCategoryItem(null); setIsDragStarted(false); return;
     }
     if (draggingNewType) {
@@ -757,7 +757,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
       if (staff) {
         let duration = 60;
         for (const category of workCategories) { const item = category.items.find(i => i.title === draggingNewType); if (item) { duration = item.duration || 60; break; } }
-        // 既存の予定＋一括ブロックの時間は避けて配置
+        // 既存の予定＋BloqueiosのHorárioは避けて配置
         const occupied = [
           ...appointments.filter(a => a.staff === staff && a.date === selectedDate).map(a => ({ start: a.start, end: a.end })),
           ...filteredBlocks.filter(b => !b.staffName || b.staffName === staff).map(blockRange),
@@ -769,7 +769,7 @@ if (settingsData?.start_hour != null || settingsData?.end_hour != null) {
           const newApp = { id: Date.now(), staff, start: bestStart, end: bestStart + duration, title: draggingNewType, date: selectedDate, customerName: "", carModel: "", notes: "" };
           if (userId) await supabase.from('appointments').insert({ id: newApp.id, user_id: userId, staff, title: draggingNewType, date: selectedDate, start_time: bestStart, end_time: bestStart + duration, customer_name: "", car_model: "", notes: "" });
           setAppointments(prev => [...prev, newApp]);
-        } else { alert('この日の空き時間がありません！'); }
+        } else { alert('Não há horários livres neste dia!'); }
       }
     }
     setDraggingNewType(null); setDraggingCategoryItem(null); setActiveAction(null); setIsDragStarted(false);
@@ -825,7 +825,7 @@ const subIconImgStyle = {
   flexShrink: 0 
 };
 
-  // ブロック設定モーダル用の部品
+  // BloqueioConfiguraçõesモーダル用の部品
   const blockLabelStyle = { fontSize: "13px", color: "#555", marginBottom: "8px", fontWeight: "bold" as const };
   const renderDayPicker = () => (
     <div style={{ display: "flex", gap: "5px" }}>
@@ -867,49 +867,49 @@ return (
       </div>
       <div style={{ display: "flex", gap: "30px", alignItems: "center" }}>
         
-        {/* スタッフ追加 */}
+        {/* Equipe */}
         <div onClick={addStaff} style={headerButtonStyle} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-6px) scale(1.15)"} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)"}>
           <div style={iconCircleStyle}>
             <img src="/shukkin.png" alt="" style={iconImgStyle} />
           </div>
           <div style={{ fontSize: "12px", color: "#333", fontWeight: "600", marginTop: "4px", whiteSpace: "nowrap" }}>
-            スタッフ追加
+            Equipe
           </div>
         </div>
 
-        {/* 出勤設定 */}
+        {/* Presença */}
         <div onClick={() => setIsAttendanceModalOpen(true)} style={headerButtonStyle} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-6px) scale(1.15)"} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)"}>
           <div style={iconCircleStyle}>
             <img src="/karennda.png" alt="" style={iconImgStyle} />
           </div>
           <div style={{ fontSize: "12px", color: "#333", fontWeight: "600", marginTop: "4px", whiteSpace: "nowrap" }}>
-            出勤設定
+            Presença
           </div>
         </div>
 
-        {/* 項目追加 */}
+        {/* Serviços */}
         <div onClick={addWorkType} style={headerButtonStyle} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-6px) scale(1.15)"} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)"}>
           <div style={iconCircleStyle}>
             <img src="/koumoku.png" alt="" style={iconImgStyle} />
           </div>
           <div style={{ fontSize: "12px", color: "#333", fontWeight: "600", marginTop: "4px", whiteSpace: "nowrap" }}>
-            項目追加
+            Serviços
           </div>
         </div>
 
-        {/* 一括ブロック */}
+        {/* Bloqueios */}
         <div onClick={openNewBlock} style={headerButtonStyle} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-6px) scale(1.15)"} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)"}>
           <div style={iconCircleStyle}>
             <img src="/ikkatuburok.png" alt="" style={iconImgStyle} />
           </div>
           <div style={{ fontSize: "12px", color: "#333", fontWeight: "600", marginTop: "4px", whiteSpace: "nowrap" }}>
-            一括ブロック
+            Bloqueios
           </div>
         </div>
 
-        {/* 顧客予約 */}
+        {/* Agendamentos */}
         <div onClick={() => { if (userPlan !== 'premium') { setShowFeaturePreview(true); return; } router.push('/reservations'); }} style={headerButtonStyle} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-6px) scale(1.15)"} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)"}>
-          {/* 顧客予約のみ、プレミアムプラン判定での特別スタイルがあるためインラインでサイズ調整を適用 */}
+          {/* Agendamentosのみ、プレミアムプラン判定での特別スタイルがあるためインラインでサイズ調整を適用 */}
           <div style={{ 
             ...iconCircleStyle, 
             width: "48px",
@@ -921,7 +921,7 @@ return (
             <img src="/kokyakuyoyaku.png" alt="" style={iconImgStyle} />
           </div>
           <div style={{ fontSize: "12px", color: userPlan === 'premium' ? "#333" : "#999", fontWeight: "600", marginTop: "4px" }}>
-            顧客予約{userPlan !== 'premium' && "🔒"}
+            Agendamentos{userPlan !== 'premium' && "🔒"}
           </div>
         </div>
 
@@ -941,7 +941,7 @@ return (
          <div onClick={() => setShowNotifications(!showNotifications)} style={{ width: "260px", height: "38px", borderRadius: "8px", background: "linear-gradient(135deg, #fffbeb, #fef3c7)", border: "1px solid #f59e0b", display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", cursor: "pointer", boxSizing: "border-box" }}>
             <div style={{ flex: 1, overflow: "hidden", position: "relative", height: "100%", display: "flex", alignItems: "center" }}>
               {notifications.length === 0 ? (
-                <span style={{ fontSize: "12px", color: "#999" }}>通知はありません</span>
+                <span style={{ fontSize: "12px", color: "#999" }}>Nenhuma notificação</span>
               ) : (
                 <div style={{ display: "flex", whiteSpace: "nowrap", animation: `notifMarquee ${Math.max(12, notifications.length * 6)}s linear infinite` }}>
                   {[...notifications, ...notifications].map((n, idx) => (
@@ -953,8 +953,8 @@ return (
             {notifications.length > 0 && (<span style={{ flexShrink: 0, background: "#ef4444", color: "white", fontSize: "10px", fontWeight: "bold", borderRadius: "10px", padding: "1px 6px", minWidth: "16px", textAlign: "center", lineHeight: "14px" }}>{notifications.length}</span>)}
           </div>
           {showNotifications && (<div style={{ position: "absolute", top: "46px", right: "0", width: "320px", background: "white", borderRadius: "12px", boxShadow: "0 10px 30px rgba(0,0,0,0.15)", border: "1px solid #eee", overflow: "hidden", maxHeight: "360px", overflowY: "auto" }}>
-            <div style={{ padding: "12px 15px", fontWeight: "bold", fontSize: "13px", borderBottom: "2px solid #f0f0f0", background: "#fcfcfc" }}>🔔 次回アクション通知</div>
-            {notifications.length === 0 ? (<div style={{ padding: "30px 15px", textAlign: "center", color: "#999", fontSize: "12px" }}>通知はありません</div>) : (notifications.map(n => (<div key={n.id} style={{ padding: "12px 15px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", gap: "10px" }}><div onClick={() => { setShowNotifications(false); router.push(`/customers?highlight=${n.rawId}`); }} style={{ flex: 1, cursor: "pointer" }}><div style={{ fontWeight: "bold", marginBottom: "4px", color: "#333", fontSize: "12px" }}>{n.title}</div><div style={{ color: "#888", fontSize: "11px" }}>{n.subtitle}</div></div><button onClick={(e) => { e.stopPropagation(); setNotifications(prev => prev.filter(x => x.id !== n.id)); }} style={{ padding: "4px 10px", borderRadius: "6px", border: "none", background: "#10b981", color: "white", fontSize: "11px", fontWeight: "bold", cursor: "pointer", flexShrink: 0 }}>✓</button></div>)))}
+            <div style={{ padding: "12px 15px", fontWeight: "bold", fontSize: "13px", borderBottom: "2px solid #f0f0f0", background: "#fcfcfc" }}>🔔 Próximas ações</div>
+            {notifications.length === 0 ? (<div style={{ padding: "30px 15px", textAlign: "center", color: "#999", fontSize: "12px" }}>Nenhuma notificação</div>) : (notifications.map(n => (<div key={n.id} style={{ padding: "12px 15px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", gap: "10px" }}><div onClick={() => { setShowNotifications(false); router.push(`/customers?highlight=${n.rawId}`); }} style={{ flex: 1, cursor: "pointer" }}><div style={{ fontWeight: "bold", marginBottom: "4px", color: "#333", fontSize: "12px" }}>{n.title}</div><div style={{ color: "#888", fontSize: "11px" }}>{n.subtitle}</div></div><button onClick={(e) => { e.stopPropagation(); setNotifications(prev => prev.filter(x => x.id !== n.id)); }} style={{ padding: "4px 10px", borderRadius: "6px", border: "none", background: "#10b981", color: "white", fontSize: "11px", fontWeight: "bold", cursor: "pointer", flexShrink: 0 }}>✓</button></div>)))}
           </div>)}
         </div>
         <div data-bookings-dropdown style={{ position: "relative", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -970,11 +970,11 @@ return (
           <div onClick={() => setShowBookings(!showBookings)} style={{ width: "180px", height: "38px", borderRadius: "8px", background: "linear-gradient(135deg, #ede9fe, #ddd6fe)", border: "1px solid #8b5cf6", display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", cursor: "pointer", boxSizing: "border-box" }}>
             <div style={{ flex: 1, overflow: "hidden", position: "relative", height: "100%", display: "flex", alignItems: "center" }}>
   {todayBookings.length === 0 ? (
-    <span style={{ fontSize: "12px", color: "#999" }}>本日のWEB予約はありません</span>
+    <span style={{ fontSize: "12px", color: "#999" }}>Nenhum agendamento online hoje</span>
   ) : (
     <div style={{ display: "flex", whiteSpace: "nowrap", animation: `notifMarquee ${Math.max(12, todayBookings.length * 6)}s linear infinite` }}>
       {[...todayBookings, ...todayBookings].map((b, idx) => (
-        <span key={idx} style={{ marginRight: "40px", fontSize: "12px", color: "#333", fontWeight: "600" }}>📩 {b.name}様 {b.title} {b.date} {b.time}</span>
+        <span key={idx} style={{ marginRight: "40px", fontSize: "12px", color: "#333", fontWeight: "600" }}>📩 {b.name} {b.title} {b.date} {b.time}</span>
       ))}
     </div>
   )}
@@ -982,35 +982,35 @@ return (
             {todayBookings.length > 0 && (<span style={{ flexShrink: 0, background: "#6366f1", color: "white", fontSize: "10px", fontWeight: "bold", borderRadius: "10px", padding: "1px 6px", minWidth: "16px", textAlign: "center", lineHeight: "14px" }}>{todayBookings.length}</span>)}
           </div>
           {showBookings && (<div style={{ position: "absolute", top: "46px", right: "0", width: "320px", background: "white", borderRadius: "12px", boxShadow: "0 10px 30px rgba(0,0,0,0.15)", border: "1px solid #eee", overflow: "hidden", maxHeight: "360px", overflowY: "auto", zIndex: 200 }}>
-            <div style={{ padding: "12px 15px", fontWeight: "bold", fontSize: "13px", borderBottom: "2px solid #f0f0f0", background: "#fcfcfc" }}>📩 本日のWEB予約</div>
-            {todayBookings.length === 0 ? (<div style={{ padding: "30px 15px", textAlign: "center", color: "#999", fontSize: "12px" }}>本日のWEB予約はありません</div>) : (todayBookings.map((b, idx) => (<div key={b.id || idx} style={{ padding: "12px 15px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", gap: "10px" }}><div style={{ flex: 1 }}><div style={{ fontWeight: "bold", marginBottom: "4px", color: "#333", fontSize: "13px" }}>👤 {b.name}様</div><div style={{ color: "#555", fontSize: "12px" }}>🔧 {b.title}</div><div style={{ color: "#888", fontSize: "11px" }}>📅 {b.date} {b.time}</div></div><button onClick={(e) => { e.stopPropagation(); const removeId = b.id; setTodayBookings(prev => prev.filter(x => x.id !== removeId)); }}style={{ padding: "4px 10px", borderRadius: "6px", border: "none", background: "#10b981", color: "white", fontSize: "11px", fontWeight: "bold", cursor: "pointer", flexShrink: 0 }}>✓</button></div>)))}
+            <div style={{ padding: "12px 15px", fontWeight: "bold", fontSize: "13px", borderBottom: "2px solid #f0f0f0", background: "#fcfcfc" }}>📩 Agendamentos online de hoje</div>
+            {todayBookings.length === 0 ? (<div style={{ padding: "30px 15px", textAlign: "center", color: "#999", fontSize: "12px" }}>Nenhum agendamento online hoje</div>) : (todayBookings.map((b, idx) => (<div key={b.id || idx} style={{ padding: "12px 15px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", gap: "10px" }}><div style={{ flex: 1 }}><div style={{ fontWeight: "bold", marginBottom: "4px", color: "#333", fontSize: "13px" }}>👤 {b.name}</div><div style={{ color: "#555", fontSize: "12px" }}>🔧 {b.title}</div><div style={{ color: "#888", fontSize: "11px" }}>📅 {b.date} {b.time}</div></div><button onClick={(e) => { e.stopPropagation(); const removeId = b.id; setTodayBookings(prev => prev.filter(x => x.id !== removeId)); }}style={{ padding: "4px 10px", borderRadius: "6px", border: "none", background: "#10b981", color: "white", fontSize: "11px", fontWeight: "bold", cursor: "pointer", flexShrink: 0 }}>✓</button></div>)))}
           </div>)}
         </div>
         <div ref={menuRef} style={{ position: "relative" }}>
           <div onClick={() => setShowAccountMenu(!showAccountMenu)} style={{ width: "40px", height: "40px", borderRadius: "8px", background: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", cursor: "pointer" }}>{userInitial}</div>
           {showAccountMenu && (<div style={{ position: "absolute", top: "50px", right: "0", width: isHelpView ? "320px" : "260px", background: "white", borderRadius: "12px", boxShadow: "0 10px 30px rgba(0,0,0,0.15)", border: "1px solid #eee", overflow: "hidden" }}>{!isSettingView ? (<><div style={{ padding: "15px", background: "#fcfcfc", borderBottom: "2px solid #e0e0e0" }}><div style={{ fontWeight: "bold", fontSize: "14px" }}>{userName}</div>
-<div style={{ fontSize: "11px", color: "#888" }}>{userEmail}</div></div><div style={{ padding: "5px 0" }}><div onClick={() => { if (userPlan === 'premium') { alert('✅ プレミアム会員済みです'); setShowAccountMenu(false); } else { setShowUpgrade(true); setShowAccountMenu(false); } }} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px" }}>⭐ 有料プラン {userPlan === 'premium' && <span style={{ fontSize: "11px", color: "#10b981", marginLeft: "4px" }}>✅ 加入中</span>}</div><div onClick={() => setIsSettingView(true)} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px" }}>⚙️ 設定</div>
-<div onClick={async () => { await supabase.auth.signOut(); router.push('/'); }} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px", color: "#ff5252" }}>🚪 ログアウト</div></div></>) : (<><div style={{ padding: "10px 15px", background: "#f3e8ff", borderBottom: "2px solid #e0e0e0", display: "flex", alignItems: "center", gap: "10px" }}><span onClick={() => { if (isHelpView) setIsHelpView(false); else setIsSettingView(false); }} style={{ cursor: "pointer", fontSize: "16px" }}>←</span><div style={{ fontWeight: "bold", fontSize: "13px" }}>{isHelpView ? "ヘルプ・お問い合わせ" : "システム設定"}</div></div><div style={{ padding: "15px", display: "flex", flexDirection: "column", gap: "15px", maxHeight: "500px", overflowY: "auto" }}>{!isHelpView ? (<><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>受付時間</div><div style={{ display: "flex", alignItems: "center", gap: "5px" }}><input type="number" value={settings.startHour} onChange={e => { const v = Number(e.target.value); const updated = { ...settings, startHour: v }; setSettings(updated); localStorage.setItem('dashboard_settings', JSON.stringify(updated)); if (userId) supabase.from('user_settings').update({ start_hour: v, updated_at: new Date().toISOString() }).eq('user_id', userId); }} style={{ width: "50px", padding: "4px", border: "2px solid #d0d0d0", borderRadius: "4px" }} /><span style={{ fontSize: "12px" }}>時 〜</span><input type="number" value={settings.endHour} onChange={e => { const v = Number(e.target.value); const updated = { ...settings, endHour: v }; setSettings(updated); localStorage.setItem('dashboard_settings', JSON.stringify(updated)); if (userId) supabase.from('user_settings').update({ end_hour: v, updated_at: new Date().toISOString() }).eq('user_id', userId); }} style={{ width: "50px", padding: "4px", border: "2px solid #d0d0d0", borderRadius: "4px" }} /><span style={{ fontSize: "12px" }}>時</span></div></div><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>時間単位 (スナップ)</div><select value={settings.timeStep} onChange={e => setSettings({ ...settings, timeStep: Number(e.target.value) })} style={{ width: "100%", padding: "5px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px" }}><option value={15}>15分単位</option><option value={30}>30分単位</option><option value={60}>60分単位</option></select></div><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>カレンダー開始曜日</div><select value={settings.startDayOfWeek} onChange={e => setSettings({ ...settings, startDayOfWeek: Number(e.target.value) })} style={{ width: "100%", padding: "5px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px" }}><option value={0}>日曜日はじまり</option><option value={1}>月曜日はじまり</option></select></div><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>タイムラインの幅 (ズーム)</div><input type="range" min="0.5" max="2.0" step="0.1" value={settings.columnWidthScale} onChange={e => setSettings({ ...settings, columnWidthScale: Number(e.target.value) })} style={{ width: "100%" }} /></div><label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", cursor: "pointer" }}><input type="checkbox" checked={settings.isCompact} onChange={e => setSettings({ ...settings, isCompact: e.target.checked })} />コンパクトモード</label><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>スタッフ管理</div>{allStaff.map((staff, idx) => (<div key={idx} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}><span style={{ flex: 1, fontSize: "12px" }}>{staff}</span><span onClick={() => removeStaffFromAll(staff)} style={{ color: "#ff5252", cursor: "pointer", fontSize: "14px" }}>×</span></div>))}</div>
+<div style={{ fontSize: "11px", color: "#888" }}>{userEmail}</div></div><div style={{ padding: "5px 0" }}><div onClick={() => { if (userPlan === 'premium') { alert('✅ Você já é Premium'); setShowAccountMenu(false); } else { setShowUpgrade(true); setShowAccountMenu(false); } }} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px" }}>⭐ Plano Premium {userPlan === 'premium' && <span style={{ fontSize: "11px", color: "#10b981", marginLeft: "4px" }}>✅ Ativo</span>}</div><div onClick={() => setIsSettingView(true)} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px" }}>⚙️ Configurações</div>
+<div onClick={async () => { await supabase.auth.signOut(); router.push('/'); }} style={{ padding: "10px 15px", cursor: "pointer", fontSize: "13px", color: "#ff5252" }}>🚪 Sair</div></div></>) : (<><div style={{ padding: "10px 15px", background: "#f3e8ff", borderBottom: "2px solid #e0e0e0", display: "flex", alignItems: "center", gap: "10px" }}><span onClick={() => { if (isHelpView) setIsHelpView(false); else setIsSettingView(false); }} style={{ cursor: "pointer", fontSize: "16px" }}>←</span><div style={{ fontWeight: "bold", fontSize: "13px" }}>{isHelpView ? "Ajuda e contato" : "Configurações"}</div></div><div style={{ padding: "15px", display: "flex", flexDirection: "column", gap: "15px", maxHeight: "500px", overflowY: "auto" }}>{!isHelpView ? (<><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Horário de atendimento</div><div style={{ display: "flex", alignItems: "center", gap: "5px" }}><input type="number" value={settings.startHour} onChange={e => { const v = Number(e.target.value); const updated = { ...settings, startHour: v }; setSettings(updated); localStorage.setItem('dashboard_settings', JSON.stringify(updated)); if (userId) supabase.from('user_settings').update({ start_hour: v, updated_at: new Date().toISOString() }).eq('user_id', userId); }} style={{ width: "50px", padding: "4px", border: "2px solid #d0d0d0", borderRadius: "4px" }} /><span style={{ fontSize: "12px" }}>h às</span><input type="number" value={settings.endHour} onChange={e => { const v = Number(e.target.value); const updated = { ...settings, endHour: v }; setSettings(updated); localStorage.setItem('dashboard_settings', JSON.stringify(updated)); if (userId) supabase.from('user_settings').update({ end_hour: v, updated_at: new Date().toISOString() }).eq('user_id', userId); }} style={{ width: "50px", padding: "4px", border: "2px solid #d0d0d0", borderRadius: "4px" }} /><span style={{ fontSize: "12px" }}>h</span></div></div><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Intervalo de tempo</div><select value={settings.timeStep} onChange={e => setSettings({ ...settings, timeStep: Number(e.target.value) })} style={{ width: "100%", padding: "5px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px" }}><option value={15}>15 minutos</option><option value={30}>30 minutos</option><option value={60}>60 minutos</option></select></div><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Início da semana</div><select value={settings.startDayOfWeek} onChange={e => setSettings({ ...settings, startDayOfWeek: Number(e.target.value) })} style={{ width: "100%", padding: "5px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px" }}><option value={0}>Domingo</option><option value={1}>Segunda-feira</option></select></div><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Largura da agenda (zoom)</div><input type="range" min="0.5" max="2.0" step="0.1" value={settings.columnWidthScale} onChange={e => setSettings({ ...settings, columnWidthScale: Number(e.target.value) })} style={{ width: "100%" }} /></div><label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", cursor: "pointer" }}><input type="checkbox" checked={settings.isCompact} onChange={e => setSettings({ ...settings, isCompact: e.target.checked })} />Modo compacto</label><div><div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Equipe</div>{allStaff.map((staff, idx) => (<div key={idx} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}><span style={{ flex: 1, fontSize: "12px" }}>{staff}</span><span onClick={() => removeStaffFromAll(staff)} style={{ color: "#ff5252", cursor: "pointer", fontSize: "14px" }}>×</span></div>))}</div>
 <div>
-  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>次回アクション通知</div>
+  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Aviso de próximas ações</div>
   <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
-    <span>期日の</span>
+    <span>Avisar</span>
     <input type="number" min="0" value={actionReminderDays} onChange={e => updateReminderDays(Number(e.target.value))} style={{ width: "50px", padding: "4px", border: "2px solid #d0d0d0", borderRadius: "4px" }} />
-    <span>日前から通知する</span>
+    <span>dias antes</span>
   </div>
 </div>
 <div>
-  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>WEB予約の同時受付枠数</div>
+  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Agendamentos online simultâneos</div>
   <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
     <input type="number" min="1" max="20" value={bookingSlots} onChange={e => updateBookingSlots(Number(e.target.value))} style={{ width: "50px", padding: "4px", border: "2px solid #d0d0d0", borderRadius: "4px" }} />
-    <span>枠（同時に受付可能な予約数）</span>
+    <span>vagas (agendamentos ao mesmo tempo)</span>
   </div>
 </div>
 
-<div onClick={() => setIsHelpView(true)} style={{ padding: "10px", textAlign: "center", borderRadius: "8px", border: "2px solid #6366f1", color: "#6366f1", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>📩 ヘルプ・お問い合わせ</div>
+<div onClick={() => setIsHelpView(true)} style={{ padding: "10px", textAlign: "center", borderRadius: "8px", border: "2px solid #6366f1", color: "#6366f1", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>📩 Ajuda e contato</div>
 <div onClick={async () => {
-  const input = window.prompt("本当に退会しますか？\n\n・すべてのデータが削除されます\n・この操作は取り消せません\n\n確認のため「退会」と入力してください：");
-  if (input !== "退会") { if (input !== null) alert("入力が一致しません。"); return; }
+  const input = window.prompt("Deseja mesmo excluir sua conta?\n\n• Todos os dados serão apagados\n• Esta ação não pode ser desfeita\n\nPara confirmar, digite EXCLUIR:");
+  if (input !== "EXCLUIR") { if (input !== null) alert("O texto digitado não confere."); return; }
   if (!userId) return;
   try {
     await supabase.from('appointments').delete().eq('user_id', userId);
@@ -1032,48 +1032,48 @@ return (
     await supabase.auth.signOut();
     router.push('/');
   } catch (e) {
-    alert('退会処理中にエラーが発生しました。サポートまでお問い合わせください。');
+    alert('Ocorreu um erro ao excluir a conta. Entre em contato com o suporte.');
   }
-}} style={{ padding: "10px", textAlign: "center", borderRadius: "8px", border: "2px solid #ef4444", color: "#ef4444", cursor: "pointer", fontSize: "13px", fontWeight: "bold", marginTop: "8px" }}>⚠️ 退会する</div>
+}} style={{ padding: "10px", textAlign: "center", borderRadius: "8px", border: "2px solid #ef4444", color: "#ef4444", cursor: "pointer", fontSize: "13px", fontWeight: "bold", marginTop: "8px" }}>⚠️ Excluir conta</div>
 </>) : (<>
-<div style={{ fontSize: "12px", color: "#888" }}>不具合・ご要望はこちらから送信できます。内容は開発者に通知されます。</div>
+<div style={{ fontSize: "12px", color: "#888" }}>Envie problemas ou sugestões por aqui. A equipe de desenvolvimento será notificada.</div>
 <div>
-  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>種類</div>
+  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Tipo</div>
   <select value={feedbackType} onChange={e => setFeedbackType(e.target.value as any)} style={{ width: "100%", padding: "6px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px" }}>
-    <option value="bug">🐛 不具合報告</option>
-    <option value="feature">🆕 機能の要望</option>
-    <option value="other">💬 その他</option>
+    <option value="bug">🐛 Relatar problema</option>
+    <option value="feature">🆕 Sugerir recurso</option>
+    <option value="other">💬 Outros</option>
   </select>
 </div>
 <div>
-  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>タイトル</div>
-  <input value={feedbackTitle} onChange={e => setFeedbackTitle(e.target.value)} placeholder="例：保存ができない" style={{ width: "100%", padding: "6px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px", boxSizing: "border-box" }} />
+  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Título</div>
+  <input value={feedbackTitle} onChange={e => setFeedbackTitle(e.target.value)} placeholder="Ex.: não consigo salvar" style={{ width: "100%", padding: "6px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px", boxSizing: "border-box" }} />
 </div>
 <div>
-  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>詳細内容</div>
-  <textarea value={feedbackContent} onChange={e => setFeedbackContent(e.target.value)} placeholder="状況や希望を入力してください" style={{ width: "100%", padding: "6px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px", boxSizing: "border-box", minHeight: "70px", fontFamily: "inherit" }} />
+  <div style={{ fontSize: "11px", color: "#666", marginBottom: "5px" }}>Detalhes</div>
+  <textarea value={feedbackContent} onChange={e => setFeedbackContent(e.target.value)} placeholder="Descreva a situação ou o que você gostaria" style={{ width: "100%", padding: "6px", border: "2px solid #d0d0d0", borderRadius: "4px", fontSize: "12px", boxSizing: "border-box", minHeight: "70px", fontFamily: "inherit" }} />
 </div>
-<button onClick={sendFeedback} disabled={feedbackSending} style={{ padding: "10px", borderRadius: "8px", border: "none", background: feedbackSending ? "#ccc" : "#6366f1", color: "white", cursor: feedbackSending ? "default" : "pointer", fontSize: "13px", fontWeight: "bold" }}>{feedbackSending ? "送信中..." : "📨 送信する"}</button>
-{feedbackSent && <div style={{ color: "#10b981", fontSize: "12px", fontWeight: "bold", textAlign: "center" }}>✓ 送信しました</div>}
+<button onClick={sendFeedback} disabled={feedbackSending} style={{ padding: "10px", borderRadius: "8px", border: "none", background: feedbackSending ? "#ccc" : "#6366f1", color: "white", cursor: feedbackSending ? "default" : "pointer", fontSize: "13px", fontWeight: "bold" }}>{feedbackSending ? "Enviando..." : "📨 Enviar"}</button>
+{feedbackSent && <div style={{ color: "#10b981", fontSize: "12px", fontWeight: "bold", textAlign: "center" }}>✓ Enviado</div>}
 </>)}</div></>)}</div>)}
         </div>
       </div>
 
-      {isAttendanceModalOpen && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "400px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}><span>出勤設定</span><span onClick={() => setIsAttendanceModalOpen(false)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ fontSize: "13px", color: "#888", marginBottom: "20px" }}>{selectedDate} の出勤スタッフを選択</div>{allStaff.length === 0 ? (<div style={{ textAlign: "center", color: "#999", padding: "20px" }}>スタッフが登録されていません</div>) : (allStaff.map(staff => { const isPresent = (attendance[selectedDate] || []).includes(staff); return (<div key={staff} onClick={() => toggleAttendance(staff)} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", marginBottom: "8px", borderRadius: "8px", border: `2px solid ${isPresent ? "#6366f1" : "#e5e7eb"}`, background: isPresent ? "#f0f0ff" : "white", cursor: "pointer" }}><div style={{ width: "24px", height: "24px", borderRadius: "50%", background: isPresent ? "#6366f1" : "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "14px" }}>{isPresent ? "✓" : ""}</div><span style={{ fontSize: "14px", fontWeight: isPresent ? "bold" : "normal" }}>{staff}</span><span style={{ marginLeft: "auto", fontSize: "12px", color: isPresent ? "#6366f1" : "#999" }}>{isPresent ? "出勤" : "休み"}</span></div>); }))}<button onClick={() => setIsAttendanceModalOpen(false)} style={{ width: "100%", padding: "12px", marginTop: "10px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", cursor: "pointer", fontWeight: "bold", fontSize: "14px" }}>完了</button></div></div>)}
+      {isAttendanceModalOpen && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "400px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}><span>Presença</span><span onClick={() => setIsAttendanceModalOpen(false)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ fontSize: "13px", color: "#888", marginBottom: "20px" }}>{selectedDate}  — selecione quem trabalha</div>{allStaff.length === 0 ? (<div style={{ textAlign: "center", color: "#999", padding: "20px" }}>Nenhum profissional cadastrado</div>) : (allStaff.map(staff => { const isPresent = (attendance[selectedDate] || []).includes(staff); return (<div key={staff} onClick={() => toggleAttendance(staff)} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", marginBottom: "8px", borderRadius: "8px", border: `2px solid ${isPresent ? "#6366f1" : "#e5e7eb"}`, background: isPresent ? "#f0f0ff" : "white", cursor: "pointer" }}><div style={{ width: "24px", height: "24px", borderRadius: "50%", background: isPresent ? "#6366f1" : "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "14px" }}>{isPresent ? "✓" : ""}</div><span style={{ fontSize: "14px", fontWeight: isPresent ? "bold" : "normal" }}>{staff}</span><span style={{ marginLeft: "auto", fontSize: "12px", color: isPresent ? "#6366f1" : "#999" }}>{isPresent ? "Presente" : "Folga"}</span></div>); }))}<button onClick={() => setIsAttendanceModalOpen(false)} style={{ width: "100%", padding: "12px", marginTop: "10px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", cursor: "pointer", fontWeight: "bold", fontSize: "14px" }}>Concluir</button></div></div>)}
 
-      {isAddItemModalOpen && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "480px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>項目追加</span><span onClick={() => setIsAddItemModalOpen(false)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "4px", marginBottom: "20px" }}><div onClick={() => setAddItemForm({ ...addItemForm, mode: "new" })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: addItemForm.mode === "new" ? "white" : "transparent", fontWeight: addItemForm.mode === "new" ? "bold" : "normal" }}>新規カテゴリ</div><div onClick={() => setAddItemForm({ ...addItemForm, mode: "existing" })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: addItemForm.mode === "existing" ? "white" : "transparent", fontWeight: addItemForm.mode === "existing" ? "bold" : "normal" }}>既存に追加</div></div>{addItemForm.mode === "new" ? (<><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>カテゴリー名</div><input type="text" value={addItemForm.categoryName} onChange={e => setAddItemForm({ ...addItemForm, categoryName: e.target.value })} placeholder="例: 点検" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>項目名</div><input type="text" value={addItemForm.itemName} onChange={e => setAddItemForm({ ...addItemForm, itemName: e.target.value })} placeholder="例: エンジン点検" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div></>) : (<><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>カテゴリーを選択</div><select value={addItemForm.categoryName} onChange={e => setAddItemForm({ ...addItemForm, categoryName: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }}><option value="">選択してください</option>{workCategories.map(cat => <option key={cat.category} value={cat.category}>{cat.category}</option>)}</select></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>項目名</div><input type="text" value={addItemForm.itemName} onChange={e => setAddItemForm({ ...addItemForm, itemName: e.target.value })} placeholder="例: 中古部品交換" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div></>)}<div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>作業時間（分）</div><input type="number" value={addItemForm.duration} onChange={e => setAddItemForm({ ...addItemForm, duration: Number(e.target.value) })} min="5" step="5" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "20px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>色を選択</div><div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>背景色</div><input type="color" value={tempBgColor} onChange={e => setTempBgColor(e.target.value)} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>枠線色</div><input type="color" value={tempBorderColor} onChange={e => setTempBorderColor(e.target.value)} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}><div style={{ width: "100%", height: "40px", background: tempBgColor, border: `3px solid ${tempBorderColor}`, borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "bold" }}>プレビュー</div></div></div><div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>{COLOR_PALETTE.map((color, idx) => (<div key={idx} onClick={() => { setTempBgColor(color.bg); setTempBorderColor(color.border); }} style={{ width: "100%", height: "50px", background: color.bg, border: tempBgColor === color.bg ? `4px solid ${color.border}` : `2px solid ${color.border}`, borderRadius: "6px", cursor: "pointer" }} />))}</div></div><div style={{ display: "flex", gap: "10px" }}><button onClick={() => setIsAddItemModalOpen(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>キャンセル</button><button onClick={saveAddItem} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>追加</button></div></div></div>)}
+      {isAddItemModalOpen && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "480px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>Serviços</span><span onClick={() => setIsAddItemModalOpen(false)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "4px", marginBottom: "20px" }}><div onClick={() => setAddItemForm({ ...addItemForm, mode: "new" })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: addItemForm.mode === "new" ? "white" : "transparent", fontWeight: addItemForm.mode === "new" ? "bold" : "normal" }}>Nova categoria</div><div onClick={() => setAddItemForm({ ...addItemForm, mode: "existing" })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: addItemForm.mode === "existing" ? "white" : "transparent", fontWeight: addItemForm.mode === "existing" ? "bold" : "normal" }}>Adicionar a existente</div></div>{addItemForm.mode === "new" ? (<><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>Nome da categoria</div><input type="text" value={addItemForm.categoryName} onChange={e => setAddItemForm({ ...addItemForm, categoryName: e.target.value })} placeholder="Ex.: Revisão" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>Nome do item</div><input type="text" value={addItemForm.itemName} onChange={e => setAddItemForm({ ...addItemForm, itemName: e.target.value })} placeholder="Ex.: Revisão do motor" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div></>) : (<><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>Escolha a categoria</div><select value={addItemForm.categoryName} onChange={e => setAddItemForm({ ...addItemForm, categoryName: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }}><option value="">Selecione</option>{workCategories.map(cat => <option key={cat.category} value={cat.category}>{cat.category}</option>)}</select></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>Nome do item</div><input type="text" value={addItemForm.itemName} onChange={e => setAddItemForm({ ...addItemForm, itemName: e.target.value })} placeholder="Ex.: Troca de peças" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div></>)}<div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>Duração (min)</div><input type="number" value={addItemForm.duration} onChange={e => setAddItemForm({ ...addItemForm, duration: Number(e.target.value) })} min="5" step="5" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "20px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>Cores</div><div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>Fundo</div><input type="color" value={tempBgColor} onChange={e => setTempBgColor(e.target.value)} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>Borda</div><input type="color" value={tempBorderColor} onChange={e => setTempBorderColor(e.target.value)} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}><div style={{ width: "100%", height: "40px", background: tempBgColor, border: `3px solid ${tempBorderColor}`, borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "bold" }}>Prévia</div></div></div><div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>{COLOR_PALETTE.map((color, idx) => (<div key={idx} onClick={() => { setTempBgColor(color.bg); setTempBorderColor(color.border); }} style={{ width: "100%", height: "50px", background: color.bg, border: tempBgColor === color.bg ? `4px solid ${color.border}` : `2px solid ${color.border}`, borderRadius: "6px", cursor: "pointer" }} />))}</div></div><div style={{ display: "flex", gap: "10px" }}><button onClick={() => setIsAddItemModalOpen(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>Cancelar</button><button onClick={saveAddItem} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>Adicionar</button></div></div></div>)}
 
-      {selectedAppointment && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setSelectedAppointment(null)}><div ref={detailModalRef} style={{ width: "520px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }} onClick={e => e.stopPropagation()}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>予約詳細</span><span onClick={() => setSelectedAppointment(null)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>予約項目</div><div style={{ fontSize: "15px", fontWeight: "bold", color: "#333", padding: "10px", background: "#f5f5f5", borderRadius: "6px", border: "2px solid #d0d0d0" }}>{editForm.title}</div></div>{[{ label: "お客様名", key: "customerName", placeholder: "お客様名を入力", type: "text" },{ label: "電話番号", key: "phone", placeholder: "090-0000-0000", type: "tel" },{ label: "その他", key: "carModel", placeholder: "メモを入力", type: "text" }].map(({ label, key, placeholder, type }) => (<div key={key} style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>{label}</div><input type={type} value={editForm[key as keyof typeof editForm]} onChange={e => setEditForm({ ...editForm, [key]: e.target.value })} placeholder={placeholder} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div>))}<div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>日付</div><input type="date" value={editForm.date} onChange={e => setEditForm({ ...editForm, date: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>スタッフ</div><input type="text" value={editForm.staff} onChange={e => setEditForm({ ...editForm, staff: e.target.value })} placeholder="スタッフ名を入力" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>時間</div><div style={{ display: "flex", alignItems: "center", gap: "10px" }}>{renderTimeSelect(editForm.startTime, v => setEditForm({ ...editForm, startTime: v }))}<span>〜</span>{renderTimeSelect(editForm.endTime, v => setEditForm({ ...editForm, endTime: v }))}</div></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>備考</div><textarea value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="備考を入力" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", minHeight: "80px", fontFamily: "inherit" }} /></div><div style={{ display: "flex", gap: "10px", marginTop: "25px" }}><button onClick={() => setSelectedAppointment(null)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer", fontSize: "13px" }}>キャンセル</button>{userPlan === 'premium' && <button onClick={() => { const params = new URLSearchParams({ name: editForm.customerName || '', phone: editForm.phone || '', carModel: editForm.carModel || '', workType: editForm.title || '', workDate: editForm.date || '', notes: editForm.notes || '' }); router.push(`/customer-register?${params.toString()}`); }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#10b981", color: "white", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>👤 顧客登録</button>}<button onClick={deleteAppointment} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #ff5252", background: "white", color: "#ff5252", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>削除</button><button onClick={saveAppointmentDetail} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>保存</button></div></div></div>)}
+      {selectedAppointment && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setSelectedAppointment(null)}><div ref={detailModalRef} style={{ width: "520px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }} onClick={e => e.stopPropagation()}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>Detalhes do agendamento</span><span onClick={() => setSelectedAppointment(null)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>Serviço</div><div style={{ fontSize: "15px", fontWeight: "bold", color: "#333", padding: "10px", background: "#f5f5f5", borderRadius: "6px", border: "2px solid #d0d0d0" }}>{editForm.title}</div></div>{[{ label: "Cliente", key: "customerName", placeholder: "Nome do cliente", type: "text" },{ label: "Telefone", key: "phone", placeholder: "(11) 90000-0000", type: "tel" },{ label: "Outros", key: "carModel", placeholder: "Adicionar nota", type: "text" }].map(({ label, key, placeholder, type }) => (<div key={key} style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>{label}</div><input type={type} value={editForm[key as keyof typeof editForm]} onChange={e => setEditForm({ ...editForm, [key]: e.target.value })} placeholder={placeholder} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div>))}<div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>Data</div><input type="date" value={editForm.date} onChange={e => setEditForm({ ...editForm, date: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>Profissional</div><input type="text" value={editForm.staff} onChange={e => setEditForm({ ...editForm, staff: e.target.value })} placeholder="Nome do profissional" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>Horário</div><div style={{ display: "flex", alignItems: "center", gap: "10px" }}>{renderTimeSelect(editForm.startTime, v => setEditForm({ ...editForm, startTime: v }))}<span>〜</span>{renderTimeSelect(editForm.endTime, v => setEditForm({ ...editForm, endTime: v }))}</div></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "12px", color: "#666", marginBottom: "6px" }}>Observações</div><textarea value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Adicionar observações" style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", minHeight: "80px", fontFamily: "inherit" }} /></div><div style={{ display: "flex", gap: "10px", marginTop: "25px" }}><button onClick={() => setSelectedAppointment(null)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer", fontSize: "13px" }}>Cancelar</button>{userPlan === 'premium' && <button onClick={() => { const params = new URLSearchParams({ name: editForm.customerName || '', phone: editForm.phone || '', carModel: editForm.carModel || '', workType: editForm.title || '', workDate: editForm.date || '', notes: editForm.notes || '' }); router.push(`/customer-register?${params.toString()}`); }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#10b981", color: "white", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>👤 Cadastrar cliente</button>}<button onClick={deleteAppointment} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #ff5252", background: "white", color: "#ff5252", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>Excluir</button><button onClick={saveAppointmentDetail} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>Salvar</button></div></div></div>)}
 
-      {/* ===== 一括ブロック 作成・編集モーダル ===== */}
+      {/* ===== Bloqueios 作成・Editarモーダル ===== */}
       {isModalOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setIsModalOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: "540px", maxHeight: "90vh", overflowY: "auto", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)", animation: "catOpen 0.3s cubic-bezier(0.22, 1, 0.36, 1)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <span style={{ fontSize: "18px", fontWeight: "bold" }}>{blockForm.editingId ? " ブロックを編集" : " 予約不可（ブロック）設定"}</span>
+              <span style={{ fontSize: "18px", fontWeight: "bold" }}>{blockForm.editingId ? " Editar bloqueio" : " Bloqueio de horários"}</span>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 {!blockForm.editingId && (
-                  <span onClick={() => { setIsModalOpen(false); setIsBlockListOpen(true); }} style={{ fontSize: "12px", color: "#7d2ae8", fontWeight: "bold", cursor: "pointer", padding: "4px 10px", border: "2px solid #e9d5ff", borderRadius: "14px" }}>設定済み（{blockedSlots.length}件）</span>
+                  <span onClick={() => { setIsModalOpen(false); setIsBlockListOpen(true); }} style={{ fontSize: "12px", color: "#7d2ae8", fontWeight: "bold", cursor: "pointer", padding: "4px 10px", border: "2px solid #e9d5ff", borderRadius: "14px" }}>Configurados ({blockedSlots.length})</span>
                 )}
                 <span onClick={() => setIsModalOpen(false)} style={{ cursor: "pointer", color: "#ccc", fontSize: "20px" }}>×</span>
               </div>
@@ -1081,18 +1081,18 @@ return (
 
             {/* 理由 */}
             <div style={{ marginBottom: "20px" }}>
-              <div style={blockLabelStyle}>理由（タイムラインに表示されます）</div>
+              <div style={blockLabelStyle}>Motivo (aparece na agenda)</div>
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
                 {BLOCK_REASONS.map(r => (
                   <div key={r} onClick={() => setBlockForm({ ...blockForm, reason: r })} style={{ padding: "6px 14px", borderRadius: "16px", cursor: "pointer", fontSize: "13px", fontWeight: "bold", background: blockForm.reason === r ? "#7d2ae8" : "#f3f4f6", color: blockForm.reason === r ? "white" : "#555", border: `2px solid ${blockForm.reason === r ? "#7d2ae8" : "#e5e7eb"}` }}>{r}</div>
                 ))}
               </div>
-              <input type="text" value={blockForm.reason} onChange={e => setBlockForm({ ...blockForm, reason: e.target.value })} placeholder="自由入力も可（例：棚卸し）" style={{ width: "100%", padding: "9px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} />
+              <input type="text" value={blockForm.reason} onChange={e => setBlockForm({ ...blockForm, reason: e.target.value })} placeholder="Ou digite livremente (ex.: inventário)" style={{ width: "100%", padding: "9px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} />
             </div>
 
             {/* 指定方法 */}
             <div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "4px", marginBottom: "16px" }}>
-              {([["range", "期間で指定"], ["dates", "日付を選ぶ"], ["weekly", "毎週の繰り返し"]] as const).map(([m, label]) => (
+              {([["range", "Por período"], ["dates", "Datas específicas"], ["weekly", "Toda semana"]] as const).map(([m, label]) => (
                 <div key={m} onClick={() => setBlockForm({ ...blockForm, mode: m })} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", background: blockForm.mode === m ? "white" : "transparent", fontWeight: blockForm.mode === m ? "bold" : "normal", boxShadow: blockForm.mode === m ? "0 1px 4px rgba(0,0,0,0.1)" : "none" }}>{label}</div>
               ))}
             </div>
@@ -1100,22 +1100,22 @@ return (
             <div style={{ marginBottom: "20px" }}>
               {blockForm.mode === "range" && (
                 <>
-                  <div style={blockLabelStyle}>期間</div>
+                  <div style={blockLabelStyle}>Período</div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
                     <input type="date" value={blockForm.startDate} onChange={e => setBlockForm({ ...blockForm, startDate: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} />
                     <span>〜</span>
                     <input type="date" value={blockForm.endDate} onChange={e => setBlockForm({ ...blockForm, endDate: e.target.value })} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0" }} />
                   </div>
-                  <div style={{ ...blockLabelStyle, fontWeight: "normal" as const, color: "#888" }}>特定の曜日のみ（任意・選ばなければ期間中すべて）</div>
+                  <div style={{ ...blockLabelStyle, fontWeight: "normal" as const, color: "#888" }}>Somente alguns dias da semana (opcional — se nenhum, todos)</div>
                   {renderDayPicker()}
                 </>
               )}
               {blockForm.mode === "dates" && (
                 <>
-                  <div style={blockLabelStyle}>日付を選んで追加</div>
+                  <div style={blockLabelStyle}>Escolha e adicione datas</div>
                   <input type="date" value="" onChange={e => { if (e.target.value && !blockForm.specificDates.includes(e.target.value)) setBlockForm({ ...blockForm, specificDates: [...blockForm.specificDates, e.target.value].sort() }); }} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "2px solid #d0d0d0", marginBottom: "10px", boxSizing: "border-box" }} />
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    {blockForm.specificDates.length === 0 && <span style={{ fontSize: "12px", color: "#bbb" }}>まだ日付が選ばれていません</span>}
+                    {blockForm.specificDates.length === 0 && <span style={{ fontSize: "12px", color: "#bbb" }}>Nenhuma data escolhida</span>}
                     {blockForm.specificDates.map(d => (
                       <div key={d} style={{ background: "#f3e8ff", color: "#7d2ae8", padding: "4px 10px", borderRadius: "15px", fontSize: "12px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}>{d} <span onClick={() => setBlockForm({ ...blockForm, specificDates: blockForm.specificDates.filter(date => date !== d) })} style={{ cursor: "pointer" }}>×</span></div>
                     ))}
@@ -1124,26 +1124,26 @@ return (
               )}
               {blockForm.mode === "weekly" && (
                 <>
-                  <div style={blockLabelStyle}>毎週ブロックする曜日（期限なし）</div>
+                  <div style={blockLabelStyle}>Dias bloqueados toda semana (sem prazo)</div>
                   {renderDayPicker()}
-                  <div style={{ fontSize: "11px", color: "#999", marginTop: "8px" }}>例：水曜日を選ぶと「毎週水曜日は定休日」になります。特定の日だけ営業する場合は、タイムライン上で「この日だけ解除」できます。</div>
+                  <div style={{ fontSize: "11px", color: "#999", marginTop: "8px" }}>Ex.: ao escolher quarta-feira, toda quarta será folga. Para abrir em um dia específico, use "Liberar apenas este dia" na agenda.</div>
                 </>
               )}
             </div>
 
-            {/* 時間 */}
+            {/* Horário */}
             <div style={{ marginBottom: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                <div style={{ ...blockLabelStyle, marginBottom: 0 }}>時間帯</div>
+                <div style={{ ...blockLabelStyle, marginBottom: 0 }}>Horário</div>
                 <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-                  <span style={{ fontSize: "13px", fontWeight: "bold", color: blockForm.allDay ? "#7d2ae8" : "#888" }}>終日</span>
+                  <span style={{ fontSize: "13px", fontWeight: "bold", color: blockForm.allDay ? "#7d2ae8" : "#888" }}>Dia inteiro</span>
                   <div onClick={() => setBlockForm({ ...blockForm, allDay: !blockForm.allDay })} style={{ width: "42px", height: "24px", borderRadius: "12px", background: blockForm.allDay ? "#7d2ae8" : "#e5e7eb", position: "relative", transition: "background 0.2s" }}>
                     <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "white", position: "absolute", top: "2px", left: blockForm.allDay ? "20px" : "2px", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
                   </div>
                 </label>
               </div>
               {blockForm.allDay ? (
-                <div style={{ padding: "10px", background: "#f3e8ff", borderRadius: "6px", fontSize: "13px", color: "#7d2ae8", fontWeight: "bold", textAlign: "center" }}>1日まるごと予約不可になります</div>
+                <div style={{ padding: "10px", background: "#f3e8ff", borderRadius: "6px", fontSize: "13px", color: "#7d2ae8", fontWeight: "bold", textAlign: "center" }}>O dia inteiro ficará indisponível</div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   {renderTimeSelect(blockForm.startTime, v => setBlockForm({ ...blockForm, startTime: v }))}
@@ -1153,53 +1153,53 @@ return (
               )}
             </div>
 
-            {/* 対象スタッフ */}
+            {/* Aplica-se aProfissional */}
             <div style={{ marginBottom: "25px" }}>
-              <div style={blockLabelStyle}>対象</div>
+              <div style={blockLabelStyle}>Aplica-se a</div>
               <select value={blockForm.staffName} onChange={e => setBlockForm({ ...blockForm, staffName: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", background: "white" }}>
-                <option value="">全員（お店全体）</option>
-                {allStaff.map(s => <option key={s} value={s}>{s} のみ</option>)}
+                <option value="">Todos (estabelecimento)</option>
+                {allStaff.map(s => <option key={s} value={s}>somente {s}</option>)}
               </select>
-              <div style={{ fontSize: "11px", color: "#999", marginTop: "6px" }}>スタッフを選ぶと、その人の行だけブロックされます（WEB予約の受付枠も1つ減ります）</div>
+              <div style={{ fontSize: "11px", color: "#999", marginTop: "6px" }}>Ao escolher um profissional, só a linha dele é bloqueada (e uma vaga online a menos)</div>
             </div>
 
             <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>キャンセル</button>
-              <button onClick={saveBlockSetting} style={{ flex: 2, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>{blockForm.editingId ? "変更を保存" : "設定を保存"}</button>
+              <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>Cancelar</button>
+              <button onClick={saveBlockSetting} style={{ flex: 2, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>{blockForm.editingId ? "Salvar alterações" : "Salvar bloqueio"}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ===== 設定済みブロック一覧 ===== */}
+      {/* ===== Configurações済みBloqueio一覧 ===== */}
       {isBlockListOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setIsBlockListOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: "580px", maxHeight: "85vh", display: "flex", flexDirection: "column", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)", animation: "catOpen 0.3s cubic-bezier(0.22, 1, 0.36, 1)" }}>
             <div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "16px", display: "flex", justifyContent: "space-between" }}>
-              <span>📋 設定済みのブロック</span>
+              <span>📋 Bloqueios configurados</span>
               <span onClick={() => setIsBlockListOpen(false)} style={{ cursor: "pointer", color: "#ccc" }}>×</span>
             </div>
             <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
               {blockedSlots.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px", color: "#999", fontSize: "13px" }}>設定済みのブロックはありません</div>
+                <div style={{ textAlign: "center", padding: "40px", color: "#999", fontSize: "13px" }}>Nenhum bloqueio configurado</div>
               ) : blockedSlots.map((b, idx) => (
                 <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", border: "2px solid #e5e7eb", borderLeft: "5px solid #9ca3af", borderRadius: "10px", animation: `catItemIn 0.3s ease ${idx * 0.03}s both` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: "bold", fontSize: "14px", color: "#111827" }}>🚫 {b.reason}</div>
                     <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px" }}>{describeBlock(b)}</div>
-                    {b.excludedDates.length > 0 && <div style={{ fontSize: "11px", color: "#2563eb", marginTop: "3px" }}>解除済みの日：{b.excludedDates.join(", ")}</div>}
+                    {b.excludedDates.length > 0 && <div style={{ fontSize: "11px", color: "#2563eb", marginTop: "3px" }}>Dias liberados: {b.excludedDates.join(", ")}</div>}
                   </div>
-                  <button onClick={() => editBlock(b)} style={{ padding: "6px 12px", borderRadius: "6px", border: "2px solid #7d2ae8", background: "white", color: "#7d2ae8", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>編集</button>
-                  <button onClick={() => deleteBlock(b)} style={{ padding: "6px 12px", borderRadius: "6px", border: "2px solid #ef4444", background: "white", color: "#ef4444", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>削除</button>
+                  <button onClick={() => editBlock(b)} style={{ padding: "6px 12px", borderRadius: "6px", border: "2px solid #7d2ae8", background: "white", color: "#7d2ae8", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>Editar</button>
+                  <button onClick={() => deleteBlock(b)} style={{ padding: "6px 12px", borderRadius: "6px", border: "2px solid #ef4444", background: "white", color: "#ef4444", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>Excluir</button>
                 </div>
               ))}
             </div>
-            <button onClick={() => { setIsBlockListOpen(false); openNewBlock(); }} style={{ padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>＋ 新しいブロックを追加</button>
+            <button onClick={() => { setIsBlockListOpen(false); openNewBlock(); }} style={{ padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>＋ Adicionar bloqueio</button>
           </div>
         </div>
       )}
 
-      {/* ===== ブロックをクリックしたときのメニュー ===== */}
+      {/* ===== Bloqueioをクリックしたときのメニュー ===== */}
       {blockMenu && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1500 }} onClick={() => setBlockMenu(null)}>
           <div onClick={e => e.stopPropagation()} style={{ position: "fixed", left: Math.min(blockMenu.x, window.innerWidth - 300), top: Math.min(blockMenu.y, window.innerHeight - 250), width: "280px", background: "white", borderRadius: "12px", boxShadow: "0 12px 32px rgba(0,0,0,0.2)", border: "1px solid #e5e7eb", overflow: "hidden", animation: "catOpen 0.25s cubic-bezier(0.22, 1, 0.36, 1)" }}>
@@ -1208,15 +1208,15 @@ return (
               <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px", lineHeight: 1.5 }}>{describeBlock(blockMenu.block)}</div>
             </div>
             {[
-              { label: `📅 この日（${selectedDate}）だけ解除`, color: "#2563eb", onClick: () => excludeBlockDate(blockMenu.block, selectedDate) },
-              { label: "✏️ この設定を編集", color: "#7d2ae8", onClick: () => editBlock(blockMenu.block) },
-              { label: "🗑 この設定をすべて削除", color: "#ef4444", onClick: () => deleteBlock(blockMenu.block) },
+              { label: `📅 Liberar apenas este dia (${selectedDate})`, color: "#2563eb", onClick: () => excludeBlockDate(blockMenu.block, selectedDate) },
+              { label: "✏️ Editar este bloqueio", color: "#7d2ae8", onClick: () => editBlock(blockMenu.block) },
+              { label: "🗑 Excluir este bloqueio", color: "#ef4444", onClick: () => deleteBlock(blockMenu.block) },
             ].map(btn => (
               <div key={btn.label} onClick={btn.onClick} style={{ padding: "11px 14px", fontSize: "13px", fontWeight: "bold", color: btn.color, cursor: "pointer", borderBottom: "1px solid #f3f4f6" }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#f9fafb"}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "white"}>{btn.label}</div>
             ))}
-            <div onClick={() => setBlockMenu(null)} style={{ padding: "10px 14px", fontSize: "12px", color: "#9ca3af", textAlign: "center", cursor: "pointer" }}>閉じる</div>
+            <div onClick={() => setBlockMenu(null)} style={{ padding: "10px 14px", fontSize: "12px", color: "#9ca3af", textAlign: "center", cursor: "pointer" }}>Fechar</div>
           </div>
         </div>
       )}
@@ -1232,7 +1232,7 @@ return (
                 const bState = getDayBlockState(dayStr);
                 const isSel = dayStr === selectedDate;
                 return (
-                  <div key={i} onClick={() => dayStr && setSelectedDate(dayStr)} title={bState === "closed" ? "休業日" : bState === "partial" ? "一部ブロックあり" : undefined}
+                  <div key={i} onClick={() => dayStr && setSelectedDate(dayStr)} title={bState === "closed" ? "Fechado" : bState === "partial" ? "Bloqueio parcial" : undefined}
                     style={{ position: "relative", height: "28px", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", cursor: dayStr ? "pointer" : "default", background: isSel ? "#7d2ae8" : bState === "closed" ? "#e5e7eb" : "white", color: isSel ? "white" : bState === "closed" ? "#9ca3af" : (isRedDay(dayStr) ? "#ff5252" : "#333"), border: "1px solid #d0d0d0", textDecoration: bState === "closed" && !isSel ? "line-through" : "none" }}>
                     {dayStr ? new Date(dayStr).getDate() : ""}
                     {bState === "partial" && <span style={{ position: "absolute", top: "3px", right: "3px", width: "6px", height: "6px", borderRadius: "50%", background: isSel ? "white" : "#f59e0b" }} />}
@@ -1245,9 +1245,9 @@ return (
         </div>
 
         <div style={{ flex: 1, borderRight: "3px solid #d0d0d0", paddingRight: "15px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          <div style={{ fontSize: "13px", fontWeight: "bold", color: "#1a1a2e", fontFamily: "'Montserrat', sans-serif", letterSpacing: "1px" }}>📝 {selectedDate} のメモ</div>
-          <textarea value={dayMemo[selectedDate] || ""} onChange={e => setDayMemo(prev => ({ ...prev, [selectedDate]: e.target.value }))} placeholder="この日のメモを入力..." style={{ flex: 1, padding: "10px", border: "2px solid #d0d0d0", borderRadius: "8px", fontSize: "12px", resize: "none", fontFamily: "inherit", outline: "none", lineHeight: "1.6" }} />
-          <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", fontWeight: "bold", textAlign: "center" }}>📅 本日の予約: {filteredAppointments.filter(a => staffList.includes(a.staff) && a.title !== "ブロック").length}件</div>
+          <div style={{ fontSize: "13px", fontWeight: "bold", color: "#1a1a2e", fontFamily: "'Montserrat', sans-serif", letterSpacing: "1px" }}>📝 Notas de {selectedDate}</div>
+          <textarea value={dayMemo[selectedDate] || ""} onChange={e => setDayMemo(prev => ({ ...prev, [selectedDate]: e.target.value }))} placeholder="Notas deste dia..." style={{ flex: 1, padding: "10px", border: "2px solid #d0d0d0", borderRadius: "8px", fontSize: "12px", resize: "none", fontFamily: "inherit", outline: "none", lineHeight: "1.6" }} />
+          <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", fontWeight: "bold", textAlign: "center" }}>📅 Agendamentos do dia: {filteredAppointments.filter(a => staffList.includes(a.staff) && a.title !== "Bloqueio").length}</div>
         </div>
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", minWidth: 0 }}>
@@ -1264,35 +1264,35 @@ return (
               return (
                 <div key="cat-list" style={viewStyle}>
                   <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "4px", color: "#333" }}>
-                    ドラッグして追加 <span style={{ fontWeight: "normal", color: "#999", fontSize: "11px" }}>（タップで開く）</span>
+                    Arraste para adicionar <span style={{ fontWeight: "normal", color: "#999", fontSize: "11px" }}>(toque para abrir)</span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px", alignContent: "start", flex: 1, overflowY: "auto", padding: "6px" }}>
                     {workCategories.map((category, idx) => (
                       <div key={category.category} onClick={() => setExpandedCategory(category.category)} onMouseEnter={hoverOn} onMouseLeave={hoverOff}
                         style={{ ...tileBase, ...itemAnim(idx), background: category.color, border: `3px solid ${category.borderColor}`, cursor: "pointer" }}>
                         <div style={{ fontWeight: "bold", fontSize: "12px", lineHeight: 1.3, wordBreak: "break-all", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{category.category}</div>
-                        <div style={{ fontSize: "10px", color: "#555", marginTop: "4px" }}>{category.items.length}項目</div>
+                        <div style={{ fontSize: "10px", color: "#555", marginTop: "4px" }}>{category.items.length} itens</div>
                         <div onClick={(e) => { e.stopPropagation(); setEditingCategory(category.category); setEditCategoryForm({ name: category.category, bgColor: category.color, borderColor: category.borderColor }); }}
                           style={{ position: "absolute", top: "4px", right: "4px", width: "20px", height: "20px", borderRadius: "50%", background: category.borderColor, color: "white", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>✎</div>
                       </div>
                     ))}
 
-                    {/* ブロック（ドラッグで追加） */}
+                    {/* Bloqueio（ArrastarでAdicionar） */}
                     <div
-                      onMouseDown={() => { setDraggingNewType("ブロック"); setDraggingCategoryItem({ categoryName: "ブロック", itemTitle: "ブロック" }); setPressedType("ブロック"); }}
+                      onMouseDown={() => { setDraggingNewType("Bloqueio"); setDraggingCategoryItem({ categoryName: "Bloqueio", itemTitle: "Bloqueio" }); setPressedType("Bloqueio"); }}
                       onMouseUp={() => { setDraggingNewType(null); setDraggingCategoryItem(null); }}
                       onMouseEnter={hoverOn} onMouseLeave={hoverOff}
                       style={{ ...tileBase, ...itemAnim(workCategories.length), background: "#d1d5db", border: "3px solid #6b7280", cursor: "grab", color: "#333" }}>
                       <div style={{ fontSize: "18px" }}>🚫</div>
-                      <div style={{ fontWeight: "bold", fontSize: "12px", marginTop: "2px" }}>ブロック</div>
-                      <div style={{ fontSize: "9px", color: "#555" }}>ドラッグ</div>
+                      <div style={{ fontWeight: "bold", fontSize: "12px", marginTop: "2px" }}>Bloqueio</div>
+                      <div style={{ fontSize: "9px", color: "#555" }}>Arrastar</div>
                     </div>
 
-                    {/* カテゴリー追加 */}
+                    {/* カテゴリーAdicionar */}
                     <div onClick={addWorkType} onMouseEnter={hoverOn} onMouseLeave={hoverOff}
                       style={{ ...tileBase, ...itemAnim(workCategories.length + 1), background: "white", border: "3px dashed #c0c0c0", cursor: "pointer", color: "#888" }}>
                       <div style={{ fontSize: "22px", lineHeight: 1 }}>＋</div>
-                      <div style={{ fontWeight: "bold", fontSize: "11px", marginTop: "4px" }}>追加</div>
+                      <div style={{ fontWeight: "bold", fontSize: "11px", marginTop: "4px" }}>Adicionar</div>
                     </div>
                   </div>
                 </div>
@@ -1303,7 +1303,7 @@ return (
             return (
               <div key={`cat-${openCat.category}`} style={viewStyle}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                  <button onClick={() => setExpandedCategory(null)} style={{ padding: "4px 10px", borderRadius: "6px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>← 戻る</button>
+                  <button onClick={() => setExpandedCategory(null)} style={{ padding: "4px 10px", borderRadius: "6px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>← Voltar</button>
                   <div style={{ flex: 1, padding: "4px 10px", borderRadius: "6px", background: openCat.color, border: `2px solid ${openCat.borderColor}`, fontWeight: "bold", fontSize: "13px", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openCat.category}</div>
                   <div onClick={() => { setEditingCategory(openCat.category); setEditCategoryForm({ name: openCat.category, bgColor: openCat.color, borderColor: openCat.borderColor }); }}
                     style={{ width: "26px", height: "26px", borderRadius: "50%", background: openCat.borderColor, color: "white", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>✎</div>
@@ -1318,13 +1318,13 @@ return (
                         style={{ background: draggingCategoryItem?.itemTitle === item.title ? "transparent" : item.color, border: `2px solid ${item.borderColor}`, borderRadius: "6px", padding: "8px", cursor: "grab", fontWeight: "bold", fontSize: "12px", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minHeight: "34px", display: "flex", alignItems: "center", justifyContent: "center", opacity: draggingCategoryItem?.itemTitle === item.title ? 0.3 : 1 }}>
                         {item.title}
                       </div>
-                      <div style={{ fontSize: "10px", color: "#666", textAlign: "center" }}>{item.duration}分</div>
+                      <div style={{ fontSize: "10px", color: "#666", textAlign: "center" }}>{item.duration} min</div>
                     </div>
                   ))}
                   <div
                     onClick={() => { setIsAddItemModalOpen(true); setAddItemForm({ mode: "existing", categoryName: openCat.category, itemName: "", duration: 60, bgColor: openCat.color, borderColor: openCat.borderColor }); setTempBgColor(openCat.color); setTempBorderColor(openCat.borderColor); }}
                     style={{ background: "white", border: `2px dashed ${openCat.borderColor}`, borderRadius: "6px", padding: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", textAlign: "center", minHeight: "34px", display: "flex", alignItems: "center", justifyContent: "center", color: openCat.borderColor, ...itemAnim(openCat.items.length) }}>
-                    ＋ 項目追加
+                    ＋ Novo item
                   </div>
                 </div>
               </div>
@@ -1334,19 +1334,19 @@ return (
         </div>
       </div>
 
-      {editingCategory && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "420px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>カテゴリー編集</span><span onClick={() => setEditingCategory(null)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>カテゴリー名</div><input type="text" value={editCategoryForm.name} onChange={e => setEditCategoryForm({ ...editCategoryForm, name: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>色を選択</div><div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>背景色</div><input type="color" value={editCategoryForm.bgColor} onChange={e => setEditCategoryForm({ ...editCategoryForm, bgColor: e.target.value })} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>枠線色</div><input type="color" value={editCategoryForm.borderColor} onChange={e => setEditCategoryForm({ ...editCategoryForm, borderColor: e.target.value })} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}><div style={{ width: "100%", height: "40px", background: editCategoryForm.bgColor, border: `3px solid ${editCategoryForm.borderColor}`, borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "bold" }}>プレビュー</div></div></div><div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>{COLOR_PALETTE.map((color, idx) => (<div key={idx} onClick={() => setEditCategoryForm({ ...editCategoryForm, bgColor: color.bg, borderColor: color.border })} style={{ width: "100%", height: "50px", background: color.bg, border: editCategoryForm.bgColor === color.bg ? `4px solid ${color.border}` : `2px solid ${color.border}`, borderRadius: "6px", cursor: "pointer" }} />))}</div></div><div style={{ display: "flex", gap: "10px", marginTop: "20px" }}><button onClick={() => setEditingCategory(null)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>キャンセル</button><button onClick={() => { if (window.confirm(`「${editingCategory}」を削除しますか？`)) { setWorkCategories(prev => prev.filter(cat => cat.category !== editingCategory)); setEditingCategory(null); } }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #ff5252", background: "white", color: "#ff5252", cursor: "pointer", fontWeight: "bold" }}>削除</button><button onClick={() => { if (!editCategoryForm.name.trim()) { alert("カテゴリー名を入力してください"); return; } setWorkCategories(prev => prev.map(cat => cat.category === editingCategory ? { ...cat, category: editCategoryForm.name.trim(), color: editCategoryForm.bgColor, borderColor: editCategoryForm.borderColor } : cat)); setEditingCategory(null); }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>保存</button></div></div></div>)}
+      {editingCategory && (<div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: "420px", background: "white", borderRadius: "16px", padding: "25px", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}><div style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "20px", display: "flex", justifyContent: "space-between" }}><span>Editar categoria</span><span onClick={() => setEditingCategory(null)} style={{ cursor: "pointer", color: "#ccc" }}>×</span></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>Nome da categoria</div><input type="text" value={editCategoryForm.name} onChange={e => setEditCategoryForm({ ...editCategoryForm, name: e.target.value })} style={{ width: "100%", padding: "10px", border: "2px solid #d0d0d0", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }} /></div><div style={{ marginBottom: "15px" }}><div style={{ fontSize: "13px", color: "#666", marginBottom: "8px" }}>Cores</div><div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>Fundo</div><input type="color" value={editCategoryForm.bgColor} onChange={e => setEditCategoryForm({ ...editCategoryForm, bgColor: e.target.value })} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1 }}><div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>Borda</div><input type="color" value={editCategoryForm.borderColor} onChange={e => setEditCategoryForm({ ...editCategoryForm, borderColor: e.target.value })} style={{ width: "100%", height: "40px", border: "2px solid #d0d0d0", borderRadius: "6px", cursor: "pointer", padding: "2px" }} /></div><div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}><div style={{ width: "100%", height: "40px", background: editCategoryForm.bgColor, border: `3px solid ${editCategoryForm.borderColor}`, borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "bold" }}>Prévia</div></div></div><div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>{COLOR_PALETTE.map((color, idx) => (<div key={idx} onClick={() => setEditCategoryForm({ ...editCategoryForm, bgColor: color.bg, borderColor: color.border })} style={{ width: "100%", height: "50px", background: color.bg, border: editCategoryForm.bgColor === color.bg ? `4px solid ${color.border}` : `2px solid ${color.border}`, borderRadius: "6px", cursor: "pointer" }} />))}</div></div><div style={{ display: "flex", gap: "10px", marginTop: "20px" }}><button onClick={() => setEditingCategory(null)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #d0d0d0", background: "white", cursor: "pointer" }}>Cancelar</button><button onClick={() => { if (window.confirm(`Excluir a categoria "${editingCategory}"?`)) { setWorkCategories(prev => prev.filter(cat => cat.category !== editingCategory)); setEditingCategory(null); } }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid #ff5252", background: "white", color: "#ff5252", cursor: "pointer", fontWeight: "bold" }}>Excluir</button><button onClick={() => { if (!editCategoryForm.name.trim()) { alert("Informe o nome da categoria"); return; } setWorkCategories(prev => prev.map(cat => cat.category === editingCategory ? { ...cat, category: editCategoryForm.name.trim(), color: editCategoryForm.bgColor, borderColor: editCategoryForm.borderColor } : cat)); setEditingCategory(null); }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#7d2ae8", color: "white", cursor: "pointer", fontWeight: "bold" }}>Salvar</button></div></div></div>)}
 
       <div data-print-timeline style={{ flex: 1, margin: "0 20px 10px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ flex: 1, background: "#ecf3f9", borderRadius: "12px", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", border: "2px solid #e8e8e8" }}>
           <div style={{ background: "linear-gradient(135deg, #1a1a2e, #0f3460)", color: "white", padding: "12px 20px", fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
-  <span>📅 {selectedDate} の予約状況　（出勤: {staffList.length}名）</span>
+  <span>📅 Agenda de {selectedDate}　(Equipe: {staffList.length})</span>
   <div ref={trashRef} data-no-print style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "320px", height: "34px", borderRadius: "17px", border: `2px dashed ${isOverTrash ? "#fca5a5" : "rgba(255,255,255,0.5)"}`, background: isOverTrash ? "rgba(239,68,68,0.85)" : "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: (activeAction && isDragStarted) || draggingNewType || draggingCategoryItem ? 1 : 0, transition: "0.2s", pointerEvents: "none", color: "white", fontSize: "12px", fontWeight: "bold" }}>
     <span>{isOverTrash ? "🔥" : "🗑️"}</span>
-    <span>{isOverTrash ? "離すと削除" : "ここにドラッグして削除"}</span>
+    <span>{isOverTrash ? "Solte para excluir" : "Arraste aqui para excluir"}</span>
   </div>
   <div data-no-print style={{ display: "flex", gap: "8px" }}>
     {(['A4', 'A3'] as const).map(p => (
-      <button key={p} onClick={() => printTimeline(p)} style={{ padding: "4px 12px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.1)", color: "white", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}>🖨 {p}で印刷</button>
+      <button key={p} onClick={() => printTimeline(p)} style={{ padding: "4px 12px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.1)", color: "white", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}>🖨 Imprimir {p}</button>
     ))}
   </div>
 </div>
@@ -1356,19 +1356,19 @@ return (
           </div>
           <div ref={scrollRef} data-print-scroll style={{ position: "relative", overflowX: "auto", overflowY: "auto", flex: 1 }}>
             <div style={{ width: "fit-content", minWidth: "100%", position: "relative" }}>
-              {staffList.length === 0 ? (<div style={{ textAlign: "center", padding: "40px", color: "#999", fontSize: "14px" }}>「出勤設定」から本日の出勤スタッフを選択してください</div>) : (
+              {staffList.length === 0 ? (<div style={{ textAlign: "center", padding: "40px", color: "#999", fontSize: "14px" }}>Selecione a equipe do dia em "Presença"</div>) : (
                 staffList.map((staff) => (
                   <div key={staff} style={{ display: "flex", borderBottom: "2px solid #d0d0d0", height: ROW_HEIGHT, position: "relative" }}>
                     <div style={{ width: SIDE_WIDTH, position: "sticky", left: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px", fontWeight: "bold", background: "#fcfcfc", borderRight: "3px solid #d0d0d0", flexShrink: 0, zIndex: 5 }}>
                       <span style={{ fontSize: settings.isCompact ? '12px' : '14px' }}>{staff}</span>
                       <div onClick={async () => {
-                        if (staff.startsWith('予約枠')) {
+                        if (staff.startsWith('Vaga ')) {
                           const options = allStaff.filter(s => !(attendance[selectedDate] || []).includes(s));
-                          if (options.length === 0) { alert('割り当て可能なスタッフがいません'); return; }
-                          const selected = window.prompt(`スタッフを選択:\n${options.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n番号を入力:`);
+                          if (options.length === 0) { alert('Nenhum profissional disponível'); return; }
+                          const selected = window.prompt(`Escolha o profissional:\n${options.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nDigite o número:`);
                           if (!selected) return;
                           const idx = parseInt(selected) - 1;
-                          if (idx < 0 || idx >= options.length) { alert('無効な番号です'); return; }
+                          if (idx < 0 || idx >= options.length) { alert('Número inválido'); return; }
                           const newName = options[idx];
                           setAppointments(prev => prev.map(app => app.staff === staff && app.date === selectedDate ? { ...app, staff: newName } : app));
                           if (userId) await supabase.from('appointments').update({ staff: newName }).eq('user_id', userId).eq('staff', staff).eq('date', selectedDate);
@@ -1378,9 +1378,9 @@ return (
                             setAttendance(prev => ({ ...prev, [selectedDate]: [...current, newName] }));
                           }
                         } else {
-                          const newName = window.prompt("スタッフ名を変更:", staff); if (newName?.trim() && newName.trim() !== staff && userId) { await supabase.from('staff_members').update({ name: newName.trim() }).eq('user_id', userId).eq('name', staff); await supabase.from('staff_attendance').update({ staff_name: newName.trim() }).eq('user_id', userId).eq('staff_name', staff); await supabase.from('appointments').update({ staff: newName.trim() }).eq('user_id', userId).eq('staff', staff); setAllStaff(prev => prev.map(s => s === staff ? newName.trim() : s)); setAttendance(prev => { const newAtt: any = {}; Object.keys(prev).forEach(date => { newAtt[date] = prev[date].map((s: string) => s === staff ? newName.trim() : s); }); return newAtt; }); setAppointments(prev => prev.map(app => app.staff === staff ? { ...app, staff: newName.trim() } : app)); }
+                          const newName = window.prompt("Novo nome do profissional:", staff); if (newName?.trim() && newName.trim() !== staff && userId) { await supabase.from('staff_members').update({ name: newName.trim() }).eq('user_id', userId).eq('name', staff); await supabase.from('staff_attendance').update({ staff_name: newName.trim() }).eq('user_id', userId).eq('staff_name', staff); await supabase.from('appointments').update({ staff: newName.trim() }).eq('user_id', userId).eq('staff', staff); setAllStaff(prev => prev.map(s => s === staff ? newName.trim() : s)); setAttendance(prev => { const newAtt: any = {}; Object.keys(prev).forEach(date => { newAtt[date] = prev[date].map((s: string) => s === staff ? newName.trim() : s); }); return newAtt; }); setAppointments(prev => prev.map(app => app.staff === staff ? { ...app, staff: newName.trim() } : app)); }
                         }
-                      }} style={{ width: "22px", height: "22px", borderRadius: "50%", background: staff.startsWith('予約枠') ? "#f59e0b" : "#7d2ae8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "11px", cursor: "pointer", flexShrink: 0 }}>{staff.startsWith('予約枠') ? '👤' : '✎'}</div>
+                      }} style={{ width: "22px", height: "22px", borderRadius: "50%", background: staff.startsWith('Vaga ') ? "#f59e0b" : "#7d2ae8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "11px", cursor: "pointer", flexShrink: 0 }}>{staff.startsWith('Vaga ') ? '👤' : '✎'}</div>
                     </div>
                     <div style={{ flex: 1, display: "flex" }}>{Array.from({ length: totalHours * 4 }).map((_, i) => (<div key={i} style={{ width: COLUMN_WIDTH / 4, borderRight: i % 4 === 3 ? "2px solid #c0c0c0" : i % 2 === 1 ? "1px solid #d8d8d8" : "1px dashed #b0b0b0", flexShrink: 0 }} />))}</div>
                     {filteredBlocks.filter(b => !b.staffName || b.staffName === staff).map((block) => {
@@ -1388,10 +1388,10 @@ return (
                       const bLeft = ((r.start / 60) - settings.startHour) * COLUMN_WIDTH;
                       const bWidth = ((r.end - r.start) / 60) * COLUMN_WIDTH;
                       return (
-                        <div key={block.id} onClick={(e) => { e.stopPropagation(); setBlockMenu({ block, x: e.clientX, y: e.clientY }); }} title="クリックで解除・編集"
+                        <div key={block.id} onClick={(e) => { e.stopPropagation(); setBlockMenu({ block, x: e.clientX, y: e.clientY }); }} title="Clique para liberar ou editar"
                           style={{ position: "absolute", left: SIDE_WIDTH + bLeft, top: 2, width: bWidth, height: "calc(100% - 4px)", background: "repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 8px, #d1d5db 8px, #d1d5db 16px)", border: "2px solid #9ca3af", borderRadius: "6px", boxSizing: "border-box", zIndex: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                           <span style={{ background: "rgba(255,255,255,0.92)", padding: "3px 12px", borderRadius: "12px", fontSize: settings.isCompact ? "11px" : "13px", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}>
-                            🚫 {block.reason}{block.allDay ? "（終日）" : `（${fmtMins(block.start)}〜${fmtMins(block.end)}）`}
+                            🚫 {block.reason}{block.allDay ? " (dia inteiro)" : ` (${fmtMins(block.start)}〜${fmtMins(block.end)}）`}
                           </span>
                         </div>
                       );
@@ -1427,15 +1427,15 @@ return (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }} onClick={() => setShowFeaturePreview(false)}>
           <div style={{ width: "520px", maxHeight: "90vh", overflowY: "auto", background: "linear-gradient(135deg, #0f172a, #1e293b)", borderRadius: "20px", padding: "30px", color: "white" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <div><div style={{ fontSize: "20px", fontWeight: "bold" }}>⭐ As-Works プレミアム</div><div style={{ fontSize: "13px", color: "#94a3b8", marginTop: "4px" }}>ビジネスをもっと効率的に</div></div>
+              <div><div style={{ fontSize: "20px", fontWeight: "bold" }}>⭐ As-Works Premium</div><div style={{ fontSize: "13px", color: "#94a3b8", marginTop: "4px" }}>Seu negócio mais eficiente</div></div>
               <span onClick={() => setShowFeaturePreview(false)} style={{ cursor: "pointer", color: "#64748b", fontSize: "24px" }}>×</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
               {[
-                { icon: "📅", title: "WEB予約受付", desc: "お客様がスマホから24時間予約可能。空き状況を自動で判定します", bg: "rgba(99,102,241,0.15)", border: "rgba(99,102,241,0.3)" },
-                { icon: "👥", title: "顧客台帳", desc: "来店履歴・車両情報・作業記録を一元管理。次回アクションも設定可能", bg: "rgba(16,185,129,0.15)", border: "rgba(16,185,129,0.3)" },
-                { icon: "📋", title: "予約管理", desc: "WEB予約の確認・承認、顧客登録への連携がワンタップで完了", bg: "rgba(245,158,11,0.15)", border: "rgba(245,158,11,0.3)" },
-                { icon: "⚙️", title: "カスタマイズ", desc: "業種に合わせた記録項目を自由に作成。作業ごとの詳細を記録できます", bg: "rgba(236,72,153,0.15)", border: "rgba(236,72,153,0.3)" },
+                { icon: "📅", title: "Agendamento online", desc: "Clientes agendam pelo celular 24h. A disponibilidade é verificada automaticamente", bg: "rgba(99,102,241,0.15)", border: "rgba(99,102,241,0.3)" },
+                { icon: "👥", title: "Clientes", desc: "Histórico de visitas, veículos e serviços em um só lugar. Defina próximas ações", bg: "rgba(16,185,129,0.15)", border: "rgba(16,185,129,0.3)" },
+                { icon: "📋", title: "Gestão de agendamentos", desc: "Confirme agendamentos online e cadastre clientes com um toque", bg: "rgba(245,158,11,0.15)", border: "rgba(245,158,11,0.3)" },
+                { icon: "⚙️", title: "Personalização", desc: "Crie campos sob medida para o seu negócio e registre cada serviço", bg: "rgba(236,72,153,0.15)", border: "rgba(236,72,153,0.3)" },
               ].map(f => (
                 <div key={f.title} style={{ background: f.bg, border: `1px solid ${f.border}`, borderRadius: "12px", padding: "16px" }}>
                   <div style={{ fontSize: "28px", marginBottom: "8px" }}>{f.icon}</div>
@@ -1446,15 +1446,15 @@ return (
             </div>
             <div style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: "12px", padding: "16px", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-                <div style={{ fontSize: "22px", fontWeight: "bold" }}>¥980<span style={{ fontSize: "13px", color: "#94a3b8" }}>/月</span></div>
-                <div style={{ fontSize: "12px", color: "#a78bfa", background: "rgba(139,92,246,0.2)", padding: "4px 10px", borderRadius: "20px" }}>30日間無料トライアル</div>
+                <div style={{ fontSize: "22px", fontWeight: "bold" }}>R$ 29,90<span style={{ fontSize: "13px", color: "#94a3b8" }}>/mês</span></div>
+                <div style={{ fontSize: "12px", color: "#a78bfa", background: "rgba(139,92,246,0.2)", padding: "4px 10px", borderRadius: "20px" }}>30 dias de teste grátis</div>
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
-                <div onClick={() => { setShowFeaturePreview(false); setShowUpgrade(true); }} style={{ flex: 1, padding: "12px", borderRadius: "10px", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", textAlign: "center", fontSize: "14px", fontWeight: "bold", cursor: "pointer" }}>無料で始める →</div>
-                <div onClick={() => setShowFeaturePreview(false)} style={{ padding: "12px 20px", borderRadius: "10px", border: "1px solid #475569", textAlign: "center", fontSize: "14px", color: "#94a3b8", cursor: "pointer" }}>閉じる</div>
+                <div onClick={() => { setShowFeaturePreview(false); setShowUpgrade(true); }} style={{ flex: 1, padding: "12px", borderRadius: "10px", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", textAlign: "center", fontSize: "14px", fontWeight: "bold", cursor: "pointer" }}>Comece grátis →</div>
+                <div onClick={() => setShowFeaturePreview(false)} style={{ padding: "12px 20px", borderRadius: "10px", border: "1px solid #475569", textAlign: "center", fontSize: "14px", color: "#94a3b8", cursor: "pointer" }}>Fechar</div>
               </div>
             </div>
-            <div style={{ textAlign: "center", fontSize: "11px", color: "#475569" }}>トライアル期間中はいつでもキャンセルできます</div>
+            <div style={{ textAlign: "center", fontSize: "11px", color: "#475569" }}>Cancele a qualquer momento durante o teste</div>
           </div>
         </div>
       )}

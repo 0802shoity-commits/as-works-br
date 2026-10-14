@@ -4,8 +4,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '../lib/supabase';
 import { BUSINESS_TYPES, getBusinessType } from '../lib/businessTypes';
 import UpgradeModal from "../components/UpgradeModal";
-import ShiftManager from "../components/ShiftManager";
-import CustomerCalendar from "../components/CustomerCalendar";
 
 type CustomerAction = {
   id: string;
@@ -30,7 +28,6 @@ export default function ReservationsPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [userId, setUserId] = useState<string>("");
-  const [customerHighlight, setCustomerHighlight] = useState<string | null>(null);
 
   const [actions, setActions] = useState<CustomerAction[]>([]);
   const [actionsLoading, setActionsLoading] = useState(false);
@@ -60,29 +57,6 @@ export default function ReservationsPage() {
   const [inspectionFrom, setInspectionFrom] = useState('');
   const [inspectionTo, setInspectionTo] = useState('');
 
-  // 予約ページ設定
-  const [shopName, setShopName] = useState('');
-  const [shopDescription, setShopDescription] = useState('');
-  const [shopBgColor, setShopBgColor] = useState('#1a1a2e');
-  const [shopImageUrl, setShopImageUrl] = useState('');
-  const [openBookingSettings, setOpenBookingSettings] = useState(false);
-  const [urlCopied, setUrlCopied] = useState(false);
-  const [shopSaving, setShopSaving] = useState(false);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [shopNameSize, setShopNameSize] = useState(28);
-  const [shopDescSize, setShopDescSize] = useState(14);
-  const [shopImageSize, setShopImageSize] = useState(140);
-  const [shopImageX, setShopImageX] = useState(50);
-
-  // 受付時間
-  const [ownerStartHour, setOwnerStartHour] = useState(8);
-  const [ownerEndHour, setOwnerEndHour] = useState(19);
-
-  // 請求管理
-  const [billingEmail, setBillingEmail] = useState('');
-  const [billingPlan, setBillingPlan] = useState('free');
-  const [billingCreatedAt, setBillingCreatedAt] = useState('');
-
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -90,23 +64,10 @@ export default function ReservationsPage() {
       setUserId(user.id);
       const { data: planData } = await supabase.from('user_plans').select('plan').eq('user_id', user.id).single();
       if (planData?.plan !== 'premium') { router.push('/dashboard'); return; }
-      setBillingPlan(planData?.plan || 'free');
-      setBillingEmail(user.email || '');
-      setBillingCreatedAt(user.created_at || '');
       const { data } = await supabase.from('customer_reservations').select('*').eq('owner_id', user.id).order('created_at', { ascending: false });
       if (data) setReservations(data);
-      const { data: settingsData } = await supabase.from('user_settings').select('business_type, shop_name, shop_description, shop_bg_color, shop_image_url, shop_name_size, shop_desc_size, shop_image_size, shop_image_x, start_hour, end_hour').eq('user_id', user.id).single();
+      const { data: settingsData } = await supabase.from('user_settings').select('business_type').eq('user_id', user.id).single();
       if (settingsData?.business_type) setBusinessType(settingsData.business_type);
-      if (settingsData?.shop_name) setShopName(settingsData.shop_name);
-      if (settingsData?.shop_description) setShopDescription(settingsData.shop_description);
-      if (settingsData?.shop_bg_color) setShopBgColor(settingsData.shop_bg_color);
-      if (settingsData?.shop_image_url) setShopImageUrl(settingsData.shop_image_url);
-      if (settingsData?.shop_name_size) setShopNameSize(settingsData.shop_name_size);
-      if (settingsData?.shop_desc_size) setShopDescSize(settingsData.shop_desc_size);
-      if (settingsData?.shop_image_size) setShopImageSize(settingsData.shop_image_size);
-      if (settingsData?.shop_image_x != null) setShopImageX(settingsData.shop_image_x);
-      if (settingsData?.start_hour != null) setOwnerStartHour(settingsData.start_hour);
-      if (settingsData?.end_hour != null) setOwnerEndHour(settingsData.end_hour);
       const { data: catData } = await supabase.from('work_categories').select('categories').eq('user_id', user.id).single();
       if (catData?.categories) setSavedCategories(catData.categories);
       const { data: atData } = await supabase.from('user_settings').select('action_types').eq('user_id', user.id).single();
@@ -277,9 +238,7 @@ export default function ReservationsPage() {
     { key: 'reservations', icon: '📋', label: '予約一覧' },
     { key: 'register', icon: '✏️', label: '顧客登録' },
     { key: 'customers', icon: '👤', label: '顧客台帳' },
-    { key: 'customerCalendar', icon: '🗓', label: '顧客カレンダー' },
     ...(businessType === 'car' ? [{ key: 'inspection', icon: '🚗', label: '車検満了日' }] : []),
-    { key: 'shifts', icon: '📅', label: 'シフト管理' },
     { key: 'message', icon: '💬', label: 'メッセージ' },
     { key: 'billing', icon: '💴', label: '請求管理' },
     { key: 'settings', icon: '⚙️', label: '設定' },
@@ -350,10 +309,11 @@ export default function ReservationsPage() {
           <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', padding: '8px 16px', fontWeight: '600', letterSpacing: '1px' }}>MENU</div>
           {menuItems.map(item => (
             <div key={item.key} onClick={() => {
-              setActiveMenu(item.key); setSearchQuery(''); setCustomerHighlight(null);
-            }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', cursor: 'pointer', background: activeMenu === item.key ? 'rgba(255,255,255,0.15)' : 'transparent', borderLeft: activeMenu === item.key ? '3px solid #6366f1' : '3px solid transparent', transition: 'all 0.2s' }}
-            onMouseEnter={e => { if (activeMenu !== item.key) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
-            onMouseLeave={e => { if (activeMenu !== item.key) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+              if (item.key === 'customers') { router.push('/customers'); return; }
+              if (item.key === 'register') { router.push('/customer-register'); return; }
+              if (item.key === 'billing') { setShowUpgrade(true); return; }
+              setActiveMenu(item.key); setSearchQuery('');
+            }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', cursor: 'pointer', background: activeMenu === item.key ? 'rgba(255,255,255,0.15)' : 'transparent', borderLeft: activeMenu === item.key ? '3px solid #6366f1' : '3px solid transparent', transition: 'all 0.2s' }}>
               <span style={{ fontSize: '16px' }}>{item.icon}</span>
               <span style={{ fontSize: '13px', color: activeMenu === item.key ? 'white' : 'rgba(255,255,255,0.7)', fontWeight: activeMenu === item.key ? '600' : 'normal' }}>{item.label}</span>
               {item.key === 'reservations' && pendingCount > 0 && (
@@ -363,9 +323,7 @@ export default function ReservationsPage() {
           ))}
         </div>
 
-        <div onClick={() => router.push('/dashboard')} style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: '13px', transition: 'all 0.2s' }}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = 'white'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)'; }}>
+        <div onClick={() => router.push('/dashboard')} style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
           <span>←</span><span>ダッシュボードに戻る</span>
         </div>
       </div>
@@ -592,9 +550,6 @@ export default function ReservationsPage() {
             </div>
           )}
 
-          {/* シフト管理（別ファイル：app/components/ShiftManager.tsx） */}
-          {activeMenu === 'shifts' && !searchQuery && <ShiftManager />}
-
           {/* メッセージ */}
           {activeMenu === 'message' && !searchQuery && (
             <div>
@@ -625,108 +580,6 @@ export default function ReservationsPage() {
               </div>
             </div>
           )}
-
-          {/* 請求管理 */}
-          {activeMenu === 'billing' && !searchQuery && (() => {
-            const today = new Date();
-            const currentMonth = today.getFullYear() + '年' + (today.getMonth() + 1) + '月';
-            const invoiceNo = `INV-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}-${userId?.slice(0, 6).toUpperCase()}`;
-            const taxRate = 0.10; const basePrice = 980; const tax = Math.floor(basePrice * taxRate); const total = basePrice + tax;
-            const billingHistory = [];
-            for (let i = 0; i < 6; i++) { const d = new Date(today.getFullYear(), today.getMonth() - i, 1); billingHistory.push({ month: `${d.getFullYear()}年${d.getMonth() + 1}月`, invoiceNo: `INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}-${userId?.slice(0, 6).toUpperCase()}`, date: `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/01`, amount: total }); }
-
-            // 明細書だけを専用ページで印刷（画面側の印刷設定の影響を受けない）
-            const printInvoice = () => {
-              const esc = (v: string) => String(v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[ch]);
-              const yen = (n: number) => `¥${n.toLocaleString()}`;
-              const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>請求明細書 ${esc(invoiceNo)}</title>
-<style>
-  @page { size: A4 portrait; margin: 16mm; }
-  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; color: #1a1a2e; margin: 0; }
-  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1a1a2e; padding-bottom: 16px; margin-bottom: 28px; }
-  .title { font-size: 28px; font-weight: bold; letter-spacing: 3px; }
-  .sub { font-size: 12px; color: #888; margin-top: 4px; }
-  .grid { display: flex; justify-content: space-between; margin-bottom: 28px; }
-  .label { font-size: 11px; color: #999; font-weight: bold; letter-spacing: 1px; margin-bottom: 6px; }
-  .val { font-size: 13px; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-  th { background: #f3f4f6; font-size: 12px; color: #555; padding: 10px 14px; border-bottom: 2px solid #e5e7eb; text-align: left; }
-  td { padding: 14px; border-bottom: 1px solid #eee; font-size: 14px; }
-  .r { text-align: right; } .c { text-align: center; }
-  .totals { width: 280px; margin-left: auto; margin-bottom: 28px; }
-  .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; color: #555; }
-  .total { font-size: 18px; font-weight: bold; color: #1a1a2e; border-top: 2px solid #1a1a2e; margin-top: 6px; padding-top: 10px; }
-  .paid { display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 10px; margin-bottom: 28px; }
-  .note { font-size: 12px; color: #888; line-height: 1.8; border-top: 1px solid #eee; padding-top: 14px; }
-</style></head><body>
-  <div class="head">
-    <div><div class="title">請求明細書</div><div class="sub">INVOICE</div></div>
-    <div style="text-align:right"><div style="font-size:15px;font-weight:bold">As-Works</div><div class="sub">ビジネス管理システム</div></div>
-  </div>
-  <div class="grid">
-    <div><div class="label">ご請求先</div><div style="font-size:15px;font-weight:bold">${esc(billingEmail)}</div><div class="val" style="color:#666">ユーザーID: ${esc((userId || '').slice(0, 8))}...</div></div>
-    <div style="text-align:right"><div class="label">請求情報</div><div class="val">請求書番号: ${esc(invoiceNo)}</div><div class="val">発行日: ${esc(today.toLocaleDateString('ja-JP'))}</div><div class="val">対象期間: ${esc(currentMonth)}</div></div>
-  </div>
-  <table>
-    <thead><tr><th>項目</th><th class="c">数量</th><th class="r">単価</th><th class="r">金額</th></tr></thead>
-    <tbody><tr>
-      <td><b>As-Works プレミアムプラン（月額）</b><div style="font-size:12px;color:#888;margin-top:4px">顧客管理・WEB予約・台帳機能</div></td>
-      <td class="c">1</td><td class="r">${yen(basePrice)}</td><td class="r"><b>${yen(basePrice)}</b></td>
-    </tr></tbody>
-  </table>
-  <div class="totals">
-    <div class="row"><span>小計</span><span>${yen(basePrice)}</span></div>
-    <div class="row"><span>消費税（10%）</span><span>${yen(tax)}</span></div>
-    <div class="row total"><span>合計</span><span>${yen(total)}</span></div>
-  </div>
-  <div class="paid"><span style="font-size:20px">✅</span><div><div style="font-weight:bold;color:#059669">お支払い済み</div><div style="font-size:12px;color:#10b981">クレジットカードによる自動引き落とし</div></div></div>
-  <div class="note"><div style="font-weight:bold;margin-bottom:4px">備考</div>
-    <div>・本請求書は As-Works プレミアムプランの月額利用料に関するものです。</div>
-    <div>・消費税は税率10%で計算しています。</div>
-    <div>・サブスクリプションはいつでもキャンセル可能です。</div>
-    <div>・ご不明な点がございましたらメッセージ機能よりお問い合わせください。</div>
-  </div>
-</body></html>`;
-              const iframe = document.createElement('iframe');
-              iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0';
-              iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0';
-              document.body.appendChild(iframe);
-              const doc = iframe.contentWindow?.document;
-              if (!doc) { document.body.removeChild(iframe); return; }
-              doc.open(); doc.write(html); doc.close();
-              setTimeout(() => {
-                iframe.contentWindow?.focus();
-                iframe.contentWindow?.print();
-                setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe); }, 1000);
-              }, 300);
-            };
-            return (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }} data-no-print><button onClick={printInvoice} style={{ padding: '10px 20px', borderRadius: '10px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>🖨 明細書を印刷 / PDF保存</button></div>
-              <div data-billing-print style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', borderBottom: '3px solid #1a1a2e', paddingBottom: '20px' }}>
-                  <div><div style={{ fontSize: '28px', fontWeight: 'bold', color: '#1a1a2e', letterSpacing: '3px' }}>請求明細書</div><div style={{ fontSize: '13px', color: '#888', marginTop: '4px' }}>INVOICE</div></div>
-                  <div style={{ textAlign: 'right' }}><div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>As-Works</div><div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>ビジネス管理システム</div></div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
-                  <div><div style={{ fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>ご請求先</div><div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1a1a2e' }}>{billingEmail}</div><div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>ユーザーID: {userId?.slice(0, 8)}...</div></div>
-                  <div style={{ textAlign: 'right' }}><div style={{ fontSize: '11px', color: '#999', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>請求情報</div><div style={{ fontSize: '13px', color: '#333' }}>請求書番号: {invoiceNo}</div><div style={{ fontSize: '13px', color: '#333', marginTop: '2px' }}>発行日: {today.toLocaleDateString('ja-JP')}</div><div style={{ fontSize: '13px', color: '#333', marginTop: '2px' }}>対象期間: {currentMonth}</div></div>
-                </div>
-                <div style={{ marginBottom: '32px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: '#f8f9fa' }}><th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>項目</th><th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>数量</th><th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>単価</th><th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#666', borderBottom: '2px solid #e5e7eb' }}>金額</th></tr></thead><tbody><tr><td style={{ padding: '16px', fontSize: '14px', fontWeight: '600', color: '#1a1a2e', borderBottom: '1px solid #f0f0f0' }}>As-Works プレミアムプラン（月額）<div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>顧客管理・WEB予約・台帳機能</div></td><td style={{ padding: '16px', textAlign: 'center', fontSize: '14px', color: '#333', borderBottom: '1px solid #f0f0f0' }}>1</td><td style={{ padding: '16px', textAlign: 'right', fontSize: '14px', color: '#333', borderBottom: '1px solid #f0f0f0' }}>¥{basePrice.toLocaleString()}</td><td style={{ padding: '16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#1a1a2e', borderBottom: '1px solid #f0f0f0' }}>¥{basePrice.toLocaleString()}</td></tr></tbody></table>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '32px' }}><div style={{ width: '280px' }}><div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#555' }}><span>小計</span><span>¥{basePrice.toLocaleString()}</span></div><div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#555' }}><span>消費税（10%）</span><span>¥{tax.toLocaleString()}</span></div><div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', fontSize: '18px', fontWeight: 'bold', color: '#1a1a2e', borderTop: '2px solid #1a1a2e', marginTop: '8px' }}><span>合計</span><span>¥{total.toLocaleString()}</span></div></div></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #a7f3d0', marginBottom: '32px' }}><span style={{ fontSize: '20px' }}>✅</span><div><div style={{ fontSize: '14px', fontWeight: 'bold', color: '#059669' }}>お支払い済み</div><div style={{ fontSize: '12px', color: '#10b981' }}>クレジットカードによる自動引き落とし</div></div></div>
-                <div style={{ fontSize: '12px', color: '#999', lineHeight: '1.8', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}><div style={{ fontWeight: 'bold', marginBottom: '4px' }}>備考</div><div>・本請求書は As-Works プレミアムプランの月額利用料に関するものです。</div><div>・消費税は税率10%で計算しています。</div><div>・サブスクリプションはいつでもキャンセル可能です。</div><div>・ご不明な点がございましたらメッセージ機能よりお問い合わせください。</div></div>
-              </div>
-              <div style={{ marginTop: '24px', background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }} data-no-print>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '16px' }}>📋 請求履歴</div>
-                {billingHistory.map((b, idx) => (<div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e5e7eb', marginBottom: '8px' }}><div><div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>{b.month}</div><div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{b.invoiceNo}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1a1a2e' }}>¥{b.amount.toLocaleString()}</div><span style={{ fontSize: '11px', background: '#f0fdf4', color: '#059669', padding: '3px 10px', borderRadius: '20px', fontWeight: 'bold' }}>支払済</span></div></div>))}
-              </div>
-            </div>
-            );
-          })()}
 
           {/* 設定 */}
           {activeMenu === 'settings' && !searchQuery && (
@@ -786,160 +639,8 @@ export default function ReservationsPage() {
             </div>
           )}
 
-          {/* 予約ページ設定セクション */}
-          {activeMenu === 'settings' && !searchQuery && (
-              <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginBottom: '16px', overflow: 'hidden' }}>
-                <div onClick={() => setOpenBookingSettings(!openBookingSettings)} style={{ padding: '20px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div><div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '4px' }}>📱 予約ページ設定</div><div style={{ fontSize: '13px', color: '#999' }}>お客様が見る予約ページの表示名・画像・デザインを管理します</div></div>
-                  <span style={{ fontSize: '18px', color: '#c0c4d0', transition: 'transform 0.2s', transform: openBookingSettings ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0, marginLeft: '16px' }}>▼</span>
-                </div>
-                {openBookingSettings && (
-                  <div style={{ padding: '0 24px 24px', borderTop: '1px solid #f0f0f0' }}>
-
-                    <div style={{ marginTop: '18px', marginBottom: '24px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🔗 予約ページURL</div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <div style={{ flex: 1, padding: '10px 14px', background: '#f8f9fa', borderRadius: '8px', border: '2px solid #e5e7eb', fontSize: '12px', color: '#333', wordBreak: 'break-all', fontFamily: 'monospace' }}>
-                          {typeof window !== 'undefined' ? `${window.location.origin}/booking?owner=${userId}` : `/booking?owner=${userId}`}
-                        </div>
-                        <button onClick={() => { const url = `${window.location.origin}/booking?owner=${userId}`; navigator.clipboard.writeText(url); setUrlCopied(true); setTimeout(() => setUrlCopied(false), 2000); }} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: urlCopied ? '#10b981' : '#6366f1', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                          {urlCopied ? '✓ コピー済み' : '📋 コピー'}
-                        </button>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#999', marginTop: '6px' }}>このURLをLINEやSNSに貼り付けてお客様に共有できます</div>
-                    </div>
-
-                    {/* ★ 受付時間設定 */}
-                    <div style={{ marginBottom: '24px', padding: '16px 20px', background: '#f0f0ff', borderRadius: '12px', border: '2px solid #c7d2fe' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#4f46e5', marginBottom: '12px' }}>🕐 受付時間</div>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '13px', color: '#555', fontWeight: 'bold' }}>開始</span>
-                          <select value={ownerStartHour} onChange={e => setOwnerStartHour(Number(e.target.value))} style={{ padding: '8px 12px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', background: 'white', cursor: 'pointer' }}>
-                            {Array.from({ length: 25 }, (_, i) => (<option key={i} value={i}>{i}:00</option>))}
-                          </select>
-                        </div>
-                        <span style={{ fontSize: '16px', color: '#999' }}>〜</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '13px', color: '#555', fontWeight: 'bold' }}>終了</span>
-                          <select value={ownerEndHour} onChange={e => setOwnerEndHour(Number(e.target.value))} style={{ padding: '8px 12px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', background: 'white', cursor: 'pointer' }}>
-                            {Array.from({ length: 25 }, (_, i) => (<option key={i} value={i}>{i}:00</option>))}
-                          </select>
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#6366f1', fontWeight: 'bold', background: '#eef2ff', padding: '6px 12px', borderRadius: '8px' }}>
-                          現在: {ownerStartHour}:00 〜 {ownerEndHour}:00
-                        </div>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>予約ページとダッシュボードの時間枠に反映されます。下の「保存する」ボタンで保存してください。</div>
-                    </div>
-
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🏪 表示名（店舗名）</div>
-                      <textarea value={shopName} onChange={e => setShopName(e.target.value)} placeholder={'例:\n○○自動車\n○○店'} rows={2} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', resize: 'vertical' }} />
-                      <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>予約ページ上部に表示されます。Enterで改行できます</div>
-                    </div>
-
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📝 説明文・キャッチコピー</div>
-                      <textarea value={shopDescription} onChange={e => setShopDescription(e.target.value)} placeholder={'例:\n24時間WEB予約受付中\nお気軽にご予約ください'} rows={2} style={{ width: '100%', padding: '12px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', resize: 'vertical' }} />
-                      <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>店舗名の下に表示されます。Enterで改行できます</div>
-                    </div>
-
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🖼 店舗画像・看板</div>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                        {shopImageUrl ? (
-                          <div style={{ position: 'relative' }}>
-                            <img src={shopImageUrl} alt="店舗画像" style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '10px', border: '2px solid #e5e7eb' }} />
-                            <button onClick={async () => { setShopImageUrl(''); await supabase.from('user_settings').upsert({ user_id: userId, shop_image_url: '', updated_at: new Date().toISOString() }, { onConflict: 'user_id' }); }} style={{ position: 'absolute', top: '-6px', right: '-6px', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                          </div>
-                        ) : (<div style={{ width: '120px', height: '80px', borderRadius: '10px', border: '2px dashed #d0d0d0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未設定</div>)}
-                        <div style={{ flex: 1 }}>
-                          <label style={{ display: 'inline-block', padding: '10px 16px', borderRadius: '8px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: imageUploading ? 'default' : 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
-                            {imageUploading ? 'アップロード中...' : '📷 画像を選択'}
-                            <input type="file" accept="image/*" style={{ display: 'none' }} disabled={imageUploading} onChange={async (e) => {
-                              const file = e.target.files?.[0]; if (!file) return;
-                              setImageUploading(true);
-                              const ext = file.name.split('.').pop();
-                              const path = `${userId}/shop-image-${Date.now()}.${ext}`;
-                              const { error } = await supabase.storage.from('shop-images').upload(path, file, { upsert: true });
-                              if (error) { alert('アップロードに失敗しました: ' + error.message); setImageUploading(false); return; }
-                              const { data: urlData } = supabase.storage.from('shop-images').getPublicUrl(path);
-                              setShopImageUrl(urlData.publicUrl);
-                              await supabase.from('user_settings').upsert({ user_id: userId, shop_image_url: urlData.publicUrl, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-                              setImageUploading(false);
-                            }} />
-                          </label>
-                          <div style={{ fontSize: '11px', color: '#999', marginTop: '6px' }}>ロゴや看板の写真を予約ページ上部に表示します</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: '24px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🎨 背景カラー</div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {[{ color: '#1a1a2e', label: 'ダーク' },{ color: '#0f3460', label: 'ネイビー' },{ color: '#1e40af', label: 'ブルー' },{ color: '#065f46', label: 'グリーン' },{ color: '#7c2d12', label: 'ブラウン' },{ color: '#581c87', label: 'パープル' },{ color: '#be123c', label: 'レッド' },{ color: '#374151', label: 'グレー' }].map(c => (
-                          <div key={c.color} onClick={() => setShopBgColor(c.color)} style={{ width: '44px', height: '44px', borderRadius: '10px', background: c.color, cursor: 'pointer', border: shopBgColor === c.color ? '3px solid #6366f1' : '2px solid #e5e7eb', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '2px', transition: 'transform 0.15s' }} onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)'} onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1)'}>{shopBgColor === c.color && <span style={{ color: 'white', fontSize: '14px' }}>✓</span>}</div>
-                        ))}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px' }}><input type="color" value={shopBgColor} onChange={e => setShopBgColor(e.target.value)} style={{ width: '44px', height: '44px', border: '2px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', padding: '2px' }} /><span style={{ fontSize: '12px', color: '#999' }}>自由選択</span></div>
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: '20px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🔤 店舗名の文字サイズ: {shopNameSize}px</div><input type="range" min="16" max="44" value={shopNameSize} onChange={e => setShopNameSize(Number(e.target.value))} style={{ width: '100%' }} /></div>
-                    <div style={{ marginBottom: '20px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>🔤 説明文の文字サイズ: {shopDescSize}px</div><input type="range" min="10" max="28" value={shopDescSize} onChange={e => setShopDescSize(Number(e.target.value))} style={{ width: '100%' }} /></div>
-
-                    {shopImageUrl && (<>
-                      <div style={{ marginBottom: '20px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📐 画像サイズ: {shopImageSize}px</div><input type="range" min="40" max="300" value={shopImageSize} onChange={e => setShopImageSize(Number(e.target.value))} style={{ width: '100%' }} /></div>
-                      <div style={{ marginBottom: '24px' }}><div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📍 画像の位置: {shopImageX === 0 ? '左端' : shopImageX === 50 ? '中央' : shopImageX === 100 ? '右端' : `${shopImageX}%`}</div><input type="range" min="0" max="100" value={shopImageX} onChange={e => setShopImageX(Number(e.target.value))} style={{ width: '100%' }} /><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#999', marginTop: '4px' }}><span>← 左</span><span>中央</span><span>右 →</span></div></div>
-                    </>)}
-
-                    <div style={{ marginBottom: '24px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>👁 プレビュー</div>
-                      <div style={{ background: `linear-gradient(135deg, ${shopBgColor} 0%, ${shopBgColor}dd 100%)`, borderRadius: '12px', padding: '24px', textAlign: 'center', color: 'white' }}>
-                        {shopImageUrl && (<div style={{ display: 'flex', marginBottom: '10px' }}><img src={shopImageUrl} alt="" style={{ width: `${shopImageSize}px`, objectFit: 'contain', borderRadius: '8px', marginLeft: `${shopImageX}%`, transform: `translateX(-${shopImageX}%)` }} /></div>)}
-                        <div style={{ fontSize: `${shopNameSize}px`, fontWeight: 'bold', letterSpacing: '2px', whiteSpace: 'pre-line' }}>{shopName || '（店舗名未設定）'}</div>
-                        <div style={{ fontSize: `${shopDescSize}px`, opacity: 0.7, marginTop: '6px', whiteSpace: 'pre-line' }}>{shopDescription || 'オンライン予約'}</div>
-                      </div>
-                    </div>
-
-                    <button onClick={async () => {
-                      setShopSaving(true);
-                      await supabase.from('user_settings').upsert({
-                        user_id: userId, shop_name: shopName, shop_description: shopDescription,
-                        shop_bg_color: shopBgColor, shop_image_url: shopImageUrl,
-                        shop_name_size: shopNameSize, shop_desc_size: shopDescSize,
-                        shop_image_size: shopImageSize, shop_image_x: shopImageX,
-                        start_hour: ownerStartHour, end_hour: ownerEndHour,
-                        updated_at: new Date().toISOString(),
-                      }, { onConflict: 'user_id' });
-                      // localStorage同期（ダッシュボードと連携）
-                      try {
-                        localStorage.setItem('startHour', String(ownerStartHour));
-                        localStorage.setItem('endHour', String(ownerEndHour));
-                      } catch (e) {}
-                      setShopSaving(false);
-                      alert('保存しました！予約ページに反映されます。');
-                    }} disabled={shopSaving} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: shopSaving ? '#ccc' : 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: shopSaving ? 'default' : 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
-                      {shopSaving ? '保存中...' : '💾 保存する'}
-                    </button>
-                  </div>
-                )}
-              </div>
-          )}
-
-          {/* 顧客登録 */}
-          {activeMenu === 'register' && !searchQuery && (<iframe src="/customer-register" style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />)}
-
-          {/* 顧客台帳 */}
-          {activeMenu === 'customers' && !searchQuery && (<iframe key={customerHighlight || 'all'} src={customerHighlight ? `/customers?highlight=${customerHighlight}` : "/customers"} style={{ width: '100%', height: 'calc(100vh - 120px)', border: 'none', borderRadius: '16px' }} />)}
-
-          {/* 顧客カレンダー */}
-          {activeMenu === 'customerCalendar' && !searchQuery && (
-            <CustomerCalendar onOpenCustomer={(id) => { setCustomerHighlight(id); setActiveMenu('customers'); }} />
-          )}
-
           {/* 準備中 */}
-          {!searchQuery && !['reservations', 'stats', 'actions', 'message', 'billing', 'settings', 'inspection', 'shifts', 'register', 'customers', 'customerCalendar'].includes(activeMenu) && (
+          {!searchQuery && !['reservations', 'stats', 'actions', 'message', 'billing', 'settings', 'inspection'].includes(activeMenu) && (
             <div style={{ textAlign: 'center', padding: '80px', background: 'white', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>{menuItems.find(m => m.key === activeMenu)?.icon}</div>
               <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>{menuItems.find(m => m.key === activeMenu)?.label}</div>
