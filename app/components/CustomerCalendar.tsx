@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '../lib/supabase';
 
-const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const MONTHS_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const toLocalDate = (iso: string) => new Date(iso).toLocaleDateString('sv-SE');
 
@@ -57,7 +58,7 @@ export default function CustomerCalendar({ onOpenCustomer }: Props) {
         m[d] = Object.entries(cs).map(([cid, works]) => ({ customer: customerById[cid], works }));
       });
     }
-    Object.values(m).forEach(list => list.sort((a, b) => (a.customer.name || '').localeCompare(b.customer.name || '', 'ja')));
+    Object.values(m).forEach(list => list.sort((a, b) => (a.customer.name || '').localeCompare(b.customer.name || '', 'pt-BR')));
     return m;
   }, [mode, customers, history, customerById]);
 
@@ -81,7 +82,7 @@ export default function CustomerCalendar({ onOpenCustomer }: Props) {
     setYear(d.getFullYear()); setMonth(d.getMonth());
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: '#999' }}>読み込み中...</div>;
+  if (loading) return <div style={{ textAlign: 'center', padding: '60px', color: '#999' }}>Carregando...</div>;
 
   return (
     <div>
@@ -91,13 +92,13 @@ export default function CustomerCalendar({ onOpenCustomer }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button onClick={() => changeMonth(-1)} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', background: 'white', cursor: 'pointer', fontSize: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>◀</button>
-          <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1a1a2e', fontFamily: 'Georgia, serif' }}>{year}年 {month + 1}月</div>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1a1a2e', fontFamily: 'Georgia, serif' }}>{MONTHS_PT[month]} {year}</div>
           <button onClick={() => changeMonth(1)} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', background: 'white', cursor: 'pointer', fontSize: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>▶</button>
-          <button onClick={() => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth()); setSelectedDate(todayStr); }} style={{ padding: '6px 14px', borderRadius: '8px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', color: '#555' }}>今日</button>
+          <button onClick={() => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth()); setSelectedDate(todayStr); }} style={{ padding: '6px 14px', borderRadius: '8px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', color: '#555' }}>Hoje</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '10px', padding: '4px' }}>
-            {([['registered', '📅 登録日', '#6366f1'], ['visit', '🔧 来店日', '#10b981']] as const).map(([m, label, color]) => (
+            {([['registered', '📅 Cadastro', '#6366f1'], ['visit', '🔧 Visitas', '#10b981']] as const).map(([m, label, color]) => (
               <div key={m} onClick={() => setMode(m)} style={{ padding: '7px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', background: mode === m ? 'white' : 'transparent', color: mode === m ? color : '#888', boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: '0.15s' }}>{label}</div>
             ))}
           </div>
@@ -107,9 +108,9 @@ export default function CustomerCalendar({ onOpenCustomer }: Props) {
       {/* 今月のサマリー */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {[
-          { label: '今月の新規登録', value: `${monthNew}人`, color: '#6366f1', bg: '#eef2ff' },
-          { label: '今月の来店', value: `${monthVisitors}人`, sub: `（延べ${monthHist.length}件）`, color: '#10b981', bg: '#ecfdf5' },
-          { label: '顧客総数', value: `${customers.length}人`, color: '#374151', bg: 'white' },
+          { label: 'Novos cadastros no mês', value: `${monthNew}`, color: '#6366f1', bg: '#eef2ff' },
+          { label: 'Visitas no mês', value: `${monthVisitors}`, sub: ` (${monthHist.length} visitas)`, color: '#10b981', bg: '#ecfdf5' },
+          { label: 'Total de clientes', value: `${customers.length}`, color: '#374151', bg: 'white' },
         ].map(s => (
           <div key={s.label} style={{ padding: '10px 18px', borderRadius: '12px', background: s.bg, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', minWidth: '140px' }}>
             <div style={{ fontSize: '11px', color: '#888', fontWeight: 'bold' }}>{s.label}</div>
@@ -144,7 +145,7 @@ export default function CustomerCalendar({ onOpenCustomer }: Props) {
                   {list.slice(0, 3).map(({ customer }) => (
                     <div key={customer.id} style={{ fontSize: '11px', fontWeight: 'bold', color: accent, background: accentBg, borderRadius: '4px', padding: '1px 5px', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{customer.name}</div>
                   ))}
-                  {list.length > 3 && <div style={{ fontSize: '10px', color: '#888', paddingLeft: '4px' }}>他{list.length - 3}人</div>}
+                  {list.length > 3 && <div style={{ fontSize: '10px', color: '#888', paddingLeft: '4px' }}>+{list.length - 3}</div>}
                 </div>
               );
             })}
@@ -153,10 +154,10 @@ export default function CustomerCalendar({ onOpenCustomer }: Props) {
 
         {/* 選択日の一覧 */}
         <div key={`${selectedDate}-${mode}`} style={{ width: '300px', flexShrink: 0, background: 'white', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', padding: '18px', animation: 'calPop 0.25s ease', position: 'sticky', top: '0' }}>
-          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1a1a2e' }}>{new Date(`${selectedDate}T00:00:00`).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}</div>
-          <div style={{ fontSize: '12px', color: accent, fontWeight: 'bold', marginTop: '2px', marginBottom: '14px' }}>{mode === 'registered' ? '新規登録' : '来店'} {selectedList.length}人</div>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1a1a2e' }}>{new Date(`${selectedDate}T00:00:00`).toLocaleDateString('pt-BR', { month: 'long', day: 'numeric', weekday: 'short' })}</div>
+          <div style={{ fontSize: '12px', color: accent, fontWeight: 'bold', marginTop: '2px', marginBottom: '14px' }}>{mode === 'registered' ? 'Novos cadastros' : 'Visitas'}: {selectedList.length}</div>
           {selectedList.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px 10px', color: '#bbb', fontSize: '13px' }}>この日の{mode === 'registered' ? '新規登録' : '来店'}はありません</div>
+            <div style={{ textAlign: 'center', padding: '30px 10px', color: '#bbb', fontSize: '13px' }}>{mode === 'registered' ? 'Nenhum cadastro' : 'Nenhuma visita'} neste dia</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '60vh', overflowY: 'auto' }}>
               {selectedList.map(({ customer, works }, idx) => (
@@ -166,10 +167,10 @@ export default function CustomerCalendar({ onOpenCustomer }: Props) {
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#eef0f5'; (e.currentTarget as HTMLElement).style.borderLeftColor = accent; (e.currentTarget as HTMLElement).style.background = 'white'; }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>{customer.name}</span>
-                    {onOpenCustomer && <span style={{ fontSize: '11px', color: accent }}>台帳 →</span>}
+                    {onOpenCustomer && <span style={{ fontSize: '11px', color: accent }}>Ficha →</span>}
                   </div>
                   {customer.phone && <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>📞 {customer.phone}</div>}
-                  {customer.car_model && <div style={{ fontSize: '12px', color: '#6b7280' }}>🚗 {customer.car_model}{customer.car_number ? `・${customer.car_number}` : ''}</div>}
+                  {customer.car_model && <div style={{ fontSize: '12px', color: '#6b7280' }}>🚗 {customer.car_model}{customer.car_number ? ` · ${customer.car_number}` : ''}</div>}
                   {works.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
                       {works.map((w, i) => <span key={i} style={{ fontSize: '10px', fontWeight: 'bold', background: '#ecfdf5', color: '#047857', padding: '2px 8px', borderRadius: '8px' }}>{w}</span>)}
