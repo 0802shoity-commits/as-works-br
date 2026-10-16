@@ -11,30 +11,31 @@ interface UserPlan {
   expires_at: string | null;
 }
 
-const PREMIUM_PRICE = 980;
+const PREMIUM_PRICE = 29.9;
+const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const FREE_FEATURES = [
-  { text: "予約管理（基本）", available: true },
-  { text: "顧客台帳（50件まで）", available: true },
-  { text: "ダッシュボード", available: true },
-  { text: "WEB予約ページ", available: false },
-  { text: "次回アクション管理", available: false },
-  { text: "スタッフ無制限", available: false },
-  { text: "顧客無制限", available: false },
-  { text: "メッセージ・通知", available: false },
-  { text: "優先サポート", available: false },
+  { text: "Agendamentos (básico)", available: true },
+  { text: "Clientes (até 50)", available: true },
+  { text: "Painel", available: true },
+  { text: "Página de agendamento online", available: false },
+  { text: "Próximas ações", available: false },
+  { text: "Equipe ilimitada", available: false },
+  { text: "Clientes ilimitados", available: false },
+  { text: "Mensagens e notificações", available: false },
+  { text: "Suporte prioritário", available: false },
 ];
 
 const PREMIUM_FEATURES = [
-  { text: "予約管理（フル機能）", available: true },
-  { text: "顧客台帳（無制限）", available: true },
-  { text: "ダッシュボード", available: true },
-  { text: "WEB予約ページ", available: true },
-  { text: "次回アクション管理", available: true },
-  { text: "スタッフ無制限", available: true },
-  { text: "顧客無制限", available: true },
-  { text: "メッセージ・通知", available: true },
-  { text: "優先サポート", available: true },
+  { text: "Agendamentos (completo)", available: true },
+  { text: "Clientes (ilimitado)", available: true },
+  { text: "Painel", available: true },
+  { text: "Página de agendamento online", available: true },
+  { text: "Próximas ações", available: true },
+  { text: "Equipe ilimitada", available: true },
+  { text: "Clientes ilimitados", available: true },
+  { text: "Mensagens e notificações", available: true },
+  { text: "Suporte prioritário", available: true },
 ];
 
 export default function BillingPage() {
@@ -80,7 +81,7 @@ export default function BillingPage() {
       const data = await res.json();
       if (data.url) window.location.href = data.url;
     } catch (e) {
-      alert("エラーが発生しました。もう一度お試しください。");
+      alert("Ocorreu um erro. Tente novamente.");
     }
     setCheckoutLoading(false);
   };
@@ -95,13 +96,13 @@ export default function BillingPage() {
       const data = await res.json();
       if (data.url) window.location.href = data.url;
     } catch (e) {
-      alert("エラーが発生しました。もう一度お試しください。");
+      alert("Ocorreu um erro. Tente novamente.");
     }
   };
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#0f172a", color: "#fff" }}>
-      読み込み中...
+      Carregando...
     </div>
   );
 
@@ -131,19 +132,19 @@ export default function BillingPage() {
           {/* ヘッダー */}
           <div className="no-print" style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
             <button onClick={() => router.push("/reservations")} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 20, cursor: "pointer" }}>←</button>
-            <h1 style={{ margin: 0, fontSize: 22 }}>請求管理</h1>
+            <h1 style={{ margin: 0, fontSize: 22 }}>Faturamento</h1>
           </div>
 
           {/* 印刷用ヘッダー */}
           <div className="no-screen print-header">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 16, borderBottom: "2px solid #1a1a2e" }}>
               <div>
-                <h1 style={{ margin: 0, fontSize: 24 }}>請求明細書</h1>
+                <h1 style={{ margin: 0, fontSize: 24 }}>Fatura</h1>
                 <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>INVOICE</div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 18, fontWeight: 700 }}>As-Works</div>
-                <div style={{ fontSize: 12, color: "#666" }}>ビジネス管理システム</div>
+                <div style={{ fontSize: 12, color: "#666" }}>Sistema de gestão</div>
               </div>
             </div>
           </div>
@@ -158,25 +159,25 @@ export default function BillingPage() {
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div className="plan-label" style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>現在のプラン</div>
+                <div className="plan-label" style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>Plano atual</div>
                 <div style={{ fontSize: 26, fontWeight: 700, display: "flex", alignItems: "center", gap: 10 }}>
                   {isPremium ? (
-                    <span style={{ color: "#60a5fa" }}>⭐ プレミアム</span>
+                    <span style={{ color: "#60a5fa" }}>⭐ Premium</span>
                   ) : (
-                    <span>無料プラン</span>
+                    <span>Plano Grátis</span>
                   )}
                 </div>
                 {isPremium && currentPlan.expires_at && (
                   <div className="plan-label" style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>
-                    有効期限：{currentPlan.expires_at}
+                    Válido até: {currentPlan.expires_at}
                   </div>
                 )}
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 32, fontWeight: 700 }}>
-                  {isPremium ? `¥${PREMIUM_PRICE.toLocaleString()}` : "¥0"}
+                  {isPremium ? brl(PREMIUM_PRICE) : "R$ 0"}
                 </div>
-                <div className="plan-label" style={{ fontSize: 13, color: "#94a3b8" }}>/月（税込）</div>
+                <div className="plan-label" style={{ fontSize: 13, color: "#94a3b8" }}>/mês</div>
               </div>
             </div>
 
@@ -191,7 +192,7 @@ export default function BillingPage() {
                     borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer",
                   }}
                 >
-                  サブスクリプションを管理
+                  Gerenciar assinatura
                 </button>
               ) : (
                 <button
@@ -202,7 +203,7 @@ export default function BillingPage() {
                     fontSize: 16, fontWeight: 700, cursor: "pointer", letterSpacing: 1,
                   }}
                 >
-                  🚀 プレミアムにアップグレード
+                  🚀 Fazer upgrade para Premium
                 </button>
               )}
             </div>
@@ -214,12 +215,12 @@ export default function BillingPage() {
               background: "#1e293b", borderRadius: 14, padding: "28px 32px",
               marginBottom: 24, border: "1px solid #334155",
             }}>
-              <h3 style={{ margin: "0 0 20px", fontSize: 18 }}>プラン比較</h3>
+              <h3 style={{ margin: "0 0 20px", fontSize: 18 }}>Comparar planos</h3>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 {/* 無料 */}
                 <div style={{ background: "#0f172a", borderRadius: 12, padding: "20px", border: "1px solid #334155" }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>無料</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>¥0<span style={{ fontSize: 13, color: "#94a3b8" }}>/月</span></div>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Grátis</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>R$ 0<span style={{ fontSize: 13, color: "#94a3b8" }}>/mês</span></div>
                   {FREE_FEATURES.map((f, i) => (
                     <div key={i} style={{ fontSize: 13, padding: "5px 0", color: f.available ? "#e2e8f0" : "#475569", display: "flex", gap: 8 }}>
                       <span>{f.available ? "✅" : "—"}</span>
@@ -237,10 +238,10 @@ export default function BillingPage() {
                     position: "absolute", top: -10, right: 16, background: "#3b82f6",
                     color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 10px",
                     borderRadius: 20,
-                  }}>おすすめ</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: "#60a5fa" }}>プレミアム</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>¥{PREMIUM_PRICE.toLocaleString()}<span style={{ fontSize: 13, color: "#94a3b8" }}>/月（税込）</span></div>
-                  <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>30日間無料トライアル</div>
+                  }}>Recomendado</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: "#60a5fa" }}>Premium</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{brl(PREMIUM_PRICE)}<span style={{ fontSize: 13, color: "#94a3b8" }}>/mês</span></div>
+                  <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>30 dias de teste grátis</div>
                   {PREMIUM_FEATURES.map((f, i) => (
                     <div key={i} style={{ fontSize: 13, padding: "5px 0", color: "#e2e8f0", display: "flex", gap: 8 }}>
                       <span>✅</span><span>{f.text}</span>
@@ -262,20 +263,20 @@ export default function BillingPage() {
                   opacity: checkoutLoading ? 0.6 : 1,
                 }}
               >
-                {checkoutLoading ? "処理中..." : "💳 30日間無料で試す"}
+                {checkoutLoading ? "Processando..." : "💳 Testar grátis por 30 dias"}
               </button>
               <div style={{ fontSize: 12, color: "#64748b", textAlign: "center", marginTop: 8 }}>
-                クレジットカード決済（Stripe）・いつでも解約可能
+                Pagamento com cartão de crédito (Stripe) · cancele quando quiser
               </div>
             </div>
           )}
 
           {/* FAQ */}
           <div className="no-print" style={{ marginTop: 24, color: "#64748b", fontSize: 13, lineHeight: 2 }}>
-            <div style={{ fontWeight: 600, color: "#94a3b8", marginBottom: 4 }}>よくある質問</div>
-            <div>Q: プレミアムはいつから使えますか？<br />A: お支払い完了後、すぐにご利用いただけます。</div>
-            <div style={{ marginTop: 8 }}>Q: 解約はできますか？<br />A: いつでも解約可能です。次回更新日までご利用いただけます。</div>
-            <div style={{ marginTop: 8 }}>Q: 請求明細は確認できますか？<br />A: 「サブスクリプションを管理」から請求履歴を確認できます。</div>
+            <div style={{ fontWeight: 600, color: "#94a3b8", marginBottom: 4 }}>Perguntas frequentes</div>
+            <div>P: Quando posso usar o Premium?<br />R: Imediatamente após a confirmação do pagamento.</div>
+            <div style={{ marginTop: 8 }}>P: Posso cancelar?<br />R: Sim, a qualquer momento. Você continua com acesso até a próxima data de renovação.</div>
+            <div style={{ marginTop: 8 }}>P: Onde vejo minhas faturas?<br />R: Em "Gerenciar assinatura" você encontra o histórico de cobranças.</div>
           </div>
         </div>
       </div>

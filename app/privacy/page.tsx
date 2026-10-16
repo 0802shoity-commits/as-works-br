@@ -1,99 +1,101 @@
 "use client";
 
+type Section = { title: string; content: string; list?: string[]; afterList?: string; contact?: boolean };
+
 export default function PrivacyPage() {
-  const sections = [
+  const sections: Section[] = [
     {
-      title: "1. はじめに",
-      content: "As-Works（以下「当サービス」）は、お客様の個人情報の保護を重要な責務と考え、個人情報の保護に関する法律（個人情報保護法）およびその他関連法令を遵守します。本プライバシーポリシーは、当サービスにおける個人情報の取り扱いについて定めるものです。"
+      title: "1. Introdução",
+      content: "O As-Works (\"nós\" ou \"Serviço\") respeita a sua privacidade. Esta Política explica como coletamos, usamos, compartilhamos e protegemos dados pessoais, em conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD – Lei nº 13.709/2018). Em relação aos dados da sua conta, o As-Works é o controlador."
     },
     {
-      title: "2. 取得する個人情報",
-      content: "当サービスでは、以下の個人情報を取得します。",
+      title: "2. Dados que coletamos",
+      content: "Podemos coletar os seguintes dados:",
       list: [
-        "氏名（Googleアカウントに登録されている名前）",
-        "メールアドレス（Googleアカウントのメールアドレス）",
-        "プロフィール画像（Googleアカウントのプロフィール画像）",
-        "予約情報（予約日時、作業内容、担当スタッフ等）",
-        "顧客情報（お客様が登録した顧客の氏名、連絡先、車両情報等）",
-        "決済情報（プレミアムプランご利用時、Stripe経由で処理。当サービスではクレジットカード番号を直接保持しません）",
-        "アクセスログ（IPアドレス、ブラウザ情報、アクセス日時等）"
+        "Nome, e-mail e foto de perfil da sua conta Google",
+        "Dados de agendamentos (datas, horários, serviços, profissionais)",
+        "Dados dos seus clientes que você cadastra (nome, telefone, endereço, veículo, pet, etc.)",
+        "Dados de pagamento do Plano Premium, processados pela Stripe ou pelo PayPal — não armazenamos números de cartão",
+        "Registros de acesso (endereço IP, navegador, data e hora), conforme o Marco Civil da Internet"
       ]
     },
     {
-      title: "3. 個人情報の利用目的",
-      content: "取得した個人情報は、以下の目的で利用します。",
+      title: "3. Para que usamos os dados e bases legais",
+      content: "Usamos os dados para as finalidades abaixo, com base na execução do contrato (art. 7º, V), no cumprimento de obrigação legal (art. 7º, II) e no legítimo interesse (art. 7º, IX) da LGPD:",
       list: [
-        "当サービスの提供・運営・改善",
-        "ユーザー認証およびアカウント管理",
-        "予約管理・顧客管理機能の提供",
-        "有料プランの決済処理",
-        "お問い合わせへの対応",
-        "サービスに関する重要なお知らせの送信",
-        "利用状況の分析およびサービス改善",
-        "不正利用の防止"
+        "Prestar, manter e melhorar o Serviço",
+        "Autenticar usuários e gerenciar contas",
+        "Oferecer as funções de agenda e cadastro de clientes",
+        "Processar pagamentos do Plano Premium",
+        "Responder a solicitações de suporte",
+        "Enviar avisos importantes sobre o Serviço",
+        "Prevenir fraudes e usos indevidos"
       ]
     },
     {
-      title: "4. 第三者提供について",
-      content: "当サービスでは、以下の外部サービスを利用しており、これらのサービス提供者に対して必要な範囲で個人情報が提供されます。",
+      title: "4. Compartilhamento com terceiros",
+      content: "Compartilhamos dados apenas na medida necessária com os fornecedores que tornam o Serviço possível:",
       list: [
-        "Google（認証・ログイン機能の提供）",
-        "Supabase（データベース・認証基盤の提供）",
-        "Stripe（決済処理の提供）",
-        "Vercel（ホスティング・サーバー運用）"
+        "Google (login e autenticação)",
+        "Supabase (banco de dados e autenticação)",
+        "Stripe e PayPal (processamento de pagamentos)",
+        "Vercel (hospedagem)"
       ],
-      afterList: "上記以外の第三者に対して、法令に基づく場合を除き、お客様の同意なく個人情報を提供することはありません。"
+      afterList: "Não vendemos dados pessoais. Fora desses casos, só compartilhamos dados mediante ordem legal ou judicial."
     },
     {
-      title: "5. データの保管",
-      content: "お客様の個人情報は、Supabaseのクラウドサーバーに保管されます。データは暗号化された通信（SSL/TLS）を通じて送受信され、適切なセキュリティ対策を講じています。なお、サーバーは日本国外に所在する場合があります。"
+      title: "5. Transferência internacional",
+      content: "O As-Works é operado a partir do Japão, e nossos fornecedores podem armazenar dados em servidores fora do Brasil (por exemplo, no Japão e nos Estados Unidos). Essas transferências são feitas para executar o contrato com você e com fornecedores que adotam salvaguardas adequadas, conforme o art. 33 da LGPD."
     },
     {
-      title: "6. データの保持期間",
-      content: "お客様の個人情報は、アカウントが有効な期間中保持します。アカウント削除のご依頼があった場合、合理的な期間内にすべての個人情報を削除します。ただし、法令により保持が義務付けられている情報については、所定の期間保持した後に削除します。"
+      title: "6. Por quanto tempo guardamos os dados",
+      content: "Mantemos os dados enquanto a sua conta estiver ativa. Ao excluir a conta, os dados são apagados em prazo razoável, exceto os que precisamos guardar por obrigação legal — por exemplo, registros de acesso por 6 meses, conforme o Marco Civil da Internet."
     },
     {
-      title: "7. Cookieの使用について",
-      content: "当サービスでは、ログイン状態の維持およびサービスの正常な動作のためにCookie（クッキー）を使用しています。Cookieはブラウザの設定により無効にすることができますが、その場合、当サービスの一部機能がご利用いただけなくなる場合があります。"
+      title: "7. Cookies",
+      content: "Usamos cookies essenciais para manter você conectado e para o funcionamento do Serviço. Você pode desativá-los no navegador, mas algumas funções podem deixar de funcionar."
     },
     {
-      title: "8. お客様の権利",
-      content: "お客様は、ご自身の個人情報について以下の権利を有しています。",
+      title: "8. Seus direitos (art. 18 da LGPD)",
+      content: "Você pode, a qualquer momento:",
       list: [
-        "個人情報の開示を請求する権利",
-        "個人情報の訂正・追加・削除を請求する権利",
-        "個人情報の利用停止を請求する権利",
-        "アカウントの削除を請求する権利"
+        "Confirmar se tratamos seus dados e acessá-los",
+        "Corrigir dados incompletos, inexatos ou desatualizados",
+        "Pedir anonimização, bloqueio ou eliminação de dados desnecessários",
+        "Pedir a portabilidade dos dados",
+        "Saber com quem compartilhamos seus dados",
+        "Revogar consentimento, quando o tratamento se basear nele",
+        "Apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD)"
       ],
-      afterList: "上記の請求は、本ポリシー末尾のお問い合わせ先までご連絡ください。本人確認のうえ、合理的な期間内に対応いたします。"
+      afterList: "Para exercer esses direitos, escreva para o contato abaixo. Responderemos em prazo razoável, após confirmar sua identidade."
     },
     {
-      title: "9. 安全管理措置",
-      content: "当サービスは、個人情報の漏洩、滅失、毀損を防止するため、以下の安全管理措置を講じています。",
+      title: "9. Segurança",
+      content: "Adotamos medidas técnicas e administrativas para proteger os dados contra acessos não autorizados, perda ou vazamento:",
       list: [
-        "SSL/TLSによる通信の暗号化",
-        "アクセス権限の適切な管理",
-        "外部サービスのセキュリティ機能の活用",
-        "定期的なセキュリティ対策の見直し"
+        "Criptografia das comunicações (SSL/TLS)",
+        "Controle de acesso por usuário",
+        "Recursos de segurança dos nossos fornecedores",
+        "Revisão periódica das medidas de segurança"
       ]
     },
     {
-      title: "10. 免責事項",
-      content: "当サービスに登録された顧客情報（お客様のエンドユーザーの情報）の管理責任は、当該情報を登録したお客様にあります。お客様は、ご自身の顧客に対して適切なプライバシーポリシーを提示し、必要な同意を取得してください。"
+      title: "10. Dados dos seus clientes",
+      content: "Quando você cadastra dados dos seus próprios clientes no As-Works, você é o controlador desses dados e nós atuamos como operador, tratando-os apenas para prestar o Serviço. Cabe a você informar seus clientes sobre esse uso e ter uma base legal adequada."
     },
     {
-      title: "11. プライバシーポリシーの変更",
-      content: "本ポリシーの内容は、法令の変更やサービスの変更に伴い、予告なく改定することがあります。改定後のポリシーは、当サービス上に掲載した時点から効力を生じるものとします。"
+      title: "11. Alterações desta Política",
+      content: "Podemos atualizar esta Política em razão de mudanças na lei ou no Serviço. A versão atualizada vale a partir da publicação nesta página, e mudanças relevantes serão comunicadas no Serviço."
     },
     {
-      title: "12. お問い合わせ",
-      content: "個人情報の取り扱いに関するお問い合わせは、以下までご連絡ください。",
+      title: "12. Contato e encarregado (DPO)",
+      content: "Para dúvidas sobre esta Política ou sobre seus dados, fale com o nosso encarregado pelo tratamento de dados pessoais:",
       contact: true
     }
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#ffffff", fontFamily: "'Segoe UI', 'Hiragino Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#ffffff", fontFamily: "'Segoe UI', sans-serif" }}>
       <header style={{ padding: "16px 40px", borderBottom: "1px solid #f0f0f0" }}>
         <a href="/" style={{ display: "flex", alignItems: "center", gap: "0px", fontSize: "22px", fontWeight: "bold", color: "#1a1a2e", textDecoration: "none", width: "fit-content" }}>
           <img src="/awwork.png" alt="As-Works" style={{ width: "50px", height: "50px", objectFit: "contain", mixBlendMode: "multiply", marginRight: "-4px" }} />
@@ -102,8 +104,8 @@ export default function PrivacyPage() {
       </header>
 
       <main style={{ maxWidth: "720px", margin: "0 auto", padding: "60px 24px" }}>
-        <h1 style={{ fontSize: "28px", fontWeight: "bold", color: "#1a1a2e", marginBottom: "8px" }}>プライバシーポリシー</h1>
-        <p style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "40px" }}>最終更新日：2026年9月20日</p>
+        <h1 style={{ fontSize: "28px", fontWeight: "bold", color: "#1a1a2e", marginBottom: "8px" }}>Política de Privacidade</h1>
+        <p style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "40px" }}>Última atualização: 16 de outubro de 2026</p>
 
         {sections.map((section, i) => (
           <div key={i} style={{ marginBottom: "36px" }}>
@@ -121,8 +123,8 @@ export default function PrivacyPage() {
             )}
             {section.contact && (
               <div style={{ marginTop: "12px", padding: "20px", background: "#f8f9ff", borderRadius: "12px", fontSize: "14px", color: "#4b5563", lineHeight: "1.8" }}>
-                サービス名：As-Works<br />
-                メール：asworks.support@gmail.com
+                Serviço: As-Works<br />
+                E-mail: asworks.support@gmail.com
               </div>
             )}
           </div>
@@ -131,11 +133,10 @@ export default function PrivacyPage() {
 
       <footer style={{ padding: "30px 40px", background: "#0f172a", textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", gap: "24px", marginBottom: "12px" }}>
-          <a href="/terms" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>利用規約</a>
-          <a href="/privacy" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>プライバシーポリシー</a>
-          <a href="/tokushoho" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>特定商取引法に基づく表記</a>
+          <a href="/terms" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>Termos de Uso</a>
+          <a href="/privacy" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>Política de Privacidade</a>
         </div>
-        <div style={{ fontSize: "13px", color: "#64748b" }}>© 2026 As-Works. All rights reserved.</div>
+        <div style={{ fontSize: "13px", color: "#64748b" }}>© 2026 As-Works. Todos os direitos reservados.</div>
       </footer>
     </div>
   );

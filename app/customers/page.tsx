@@ -17,9 +17,9 @@ const CATEGORY_COLORS = [
 
 const AVATAR_GRADIENT = 'linear-gradient(135deg, #9ca3af, #6b7280)';
 
-const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-// 最終来店からこの日数以上たったお客様を「休眠」とする
+// Última visitaからこの日数以上たったお客様を「Inativo」とする
 const DORMANT_DAYS = 90;
 
 type CustomerAction = {
@@ -75,7 +75,7 @@ function CustomersPage()  {
   const [showPastLogs, setShowPastLogs] = useState<{ [customerId: string]: boolean }>({});
   const [selectedActionCat, setSelectedActionCat] = useState<string>('');
   const [dateMode, setDateMode] = useState<'registered' | 'lastVisit'>('registered');
-  // 並び替え・表示切替・休眠フィルター
+  // 並び替え・表示切替・Inativoフィルター
   const [sortMode, setSortMode] = useState<'registered' | 'lastVisit' | 'visits' | 'name' | 'longAgo'>('registered');
   const [displayMode, setDisplayMode] = useState<'card' | 'table'>('card');
   const [dormantOnly, setDormantOnly] = useState(false);
@@ -171,21 +171,21 @@ function CustomersPage()  {
   }, [searchParams, customers]);
 
   const handleSaveAction = async () => {
-    if (!actionForm.type) { alert('アクション内容を選択してください'); return; }
+    if (!actionForm.type) { alert('Escolha a ação'); return; }
     if (!currentUserId || !actionModal) return;
     const existing = customerActions[actionModal.id];
     if (existing) {
       const { data, error } = await supabase.from('customer_actions').update({
         action_type: actionForm.type, scheduled_date: actionForm.dueDate || null, notes: actionForm.notes || null,
       }).eq('id', existing.id).select().single();
-      if (error) { alert('保存に失敗しました: ' + error.message); return; }
+      if (error) { alert('Falha ao salvar: ' + error.message); return; }
       if (data) setCustomerActions(prev => ({ ...prev, [actionModal.id]: data }));
     } else {
       const { data, error } = await supabase.from('customer_actions').insert({
         user_id: currentUserId, customer_id: actionModal.id, customer_name: actionModal.name,
         action_type: actionForm.type, scheduled_date: actionForm.dueDate || null, notes: actionForm.notes || null, status: 'pending',
       }).select().single();
-      if (error) { alert('保存に失敗しました: ' + error.message); return; }
+      if (error) { alert('Falha ao salvar: ' + error.message); return; }
       if (data) setCustomerActions(prev => ({ ...prev, [actionModal.id]: data }));
     }
     setActionModal(null);
@@ -193,7 +193,7 @@ function CustomersPage()  {
 
   const handleCancelAction = async (customerId: string, actionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('次回アクションを解除しますか？')) return;
+    if (!window.confirm('Remover a próxima ação?')) return;
     await supabase.from('customer_actions').update({ status: 'done' }).eq('id', actionId);
     setCustomerActions(prev => { const n = { ...prev }; delete n[customerId]; return n; });
     const action = Object.values(customerActions).find(a => a.id === actionId);
@@ -213,7 +213,7 @@ function CustomersPage()  {
     if (logData) {
       setActionLogs(prev => ({ ...prev, [responseModal.action.id]: [...(prev[responseModal.action.id] || []), logData] }));
     }
-    if (responseType === '対応済み') {
+    if (responseType === 'Resolvido') {
       await supabase.from('customer_actions').update({ status: 'done' }).eq('id', responseModal.action.id);
       setCustomerActions(prev => { const n = { ...prev }; delete n[responseModal.customer.id]; return n; });
       const allLogs = [...(actionLogs[responseModal.action.id] || []), ...(logData ? [logData] : [])];
@@ -237,14 +237,14 @@ function CustomersPage()  {
     if (savedCategories.length === 0) {
       const types = [...new Set(allHistory.map(h => h.work_type).filter(Boolean))];
       const cats = types.map((type, idx) => ({ key: type, label: type, icon: '📋', color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length].color, gradient: CATEGORY_COLORS[idx % CATEGORY_COLORS.length].gradient }));
-      return [{ key: 'all', label: 'すべて', icon: '📋', color: '#6366f1', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' }, ...cats];
+      return [{ key: 'all', label: 'Todos', icon: '📋', color: '#6366f1', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' }, ...cats];
     }
     const cats = savedCategories.map((cat, idx) => ({
       key: cat.category, label: cat.category, icon: '📋',
       color: cat.borderColor || CATEGORY_COLORS[idx % CATEGORY_COLORS.length].color,
       gradient: `linear-gradient(135deg, ${cat.borderColor || CATEGORY_COLORS[idx % CATEGORY_COLORS.length].color}, ${cat.borderColor || CATEGORY_COLORS[idx % CATEGORY_COLORS.length].color}dd)`,
     }));
-    return [{ key: 'all', label: 'すべて', icon: '📋', color: '#6366f1', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' }, ...cats];
+    return [{ key: 'all', label: 'Todos', icon: '📋', color: '#6366f1', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' }, ...cats];
   }, [savedCategories, allHistory]);
 
   const activeCatInfo = dynamicCategories.find(c => c.key === activeCategory) || dynamicCategories[0];
@@ -252,10 +252,10 @@ function CustomersPage()  {
   const getInspectionStatus = (date: string) => {
     if (!date) return null;
     const diffDays = Math.floor((new Date(date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return { label: '期限切れ', color: '#ef4444', bg: '#fff0f0' };
-    if (diffDays <= 30) return { label: `あと${diffDays}日`, color: '#f59e0b', bg: '#fffbeb' };
-    if (diffDays <= 90) return { label: `あと${diffDays}日`, color: '#10b981', bg: '#f0fdf4' };
-    return { label: `あと${diffDays}日`, color: '#6366f1', bg: '#f0f0ff' };
+    if (diffDays < 0) return { label: 'Vencido', color: '#ef4444', bg: '#fff0f0' };
+    if (diffDays <= 30) return { label: `faltam ${diffDays} dias`, color: '#f59e0b', bg: '#fffbeb' };
+    if (diffDays <= 90) return { label: `faltam ${diffDays} dias`, color: '#10b981', bg: '#f0fdf4' };
+    return { label: `faltam ${diffDays} dias`, color: '#6366f1', bg: '#f0f0ff' };
   };
 
   const getCustomerCategory = (customerId: string) => {
@@ -264,7 +264,7 @@ function CustomersPage()  {
     return new Set(hist.map(h => h.work_type).filter(Boolean));
   };
 
-  // 来店回数・最終来店日・経過日数
+  // Nº de visitas・Última visita・経過日数
   const visitStats = (customer: any) => {
     const hist = histories[customer.id] || [];
     const dates = hist.map(h => h.work_date).filter(Boolean).sort();
@@ -305,7 +305,7 @@ function CustomersPage()  {
   const sorted = [...filtered].sort((a, b) => {
     const sa = visitStats(a), sb = visitStats(b);
     switch (sortMode) {
-      case 'name': return (a.name || '').localeCompare(b.name || '', 'ja');
+      case 'name': return (a.name || '').localeCompare(b.name || '', 'pt-BR');
       case 'visits': return sb.count - sa.count;
       case 'lastVisit': return (sb.last || '').localeCompare(sa.last || '');
       case 'longAgo': return (sb.days ?? -1) - (sa.days ?? -1);
@@ -329,13 +329,13 @@ function CustomersPage()  {
   // CSV出力（今表示中のお客様）
   const exportCsv = () => {
     const extraFields = isCar ? [] : bt.fields.filter((f: any) => f.type !== 'textarea');
-    const header = ['名前', '電話番号', '住所',
-      ...(isCar ? ['車種', 'ナンバー', '車検満了日'] : extraFields.map((f: any) => f.label)),
-      '登録日', '来店回数', '最終来店日', '最終来店からの日数', '状態'];
+    const header = ['Nome', 'Telefone', 'Endereço',
+      ...(isCar ? ['Modelo', 'Placa', 'Vencimento do licenciamento'] : extraFields.map((f: any) => f.label)),
+      'Cadastro', 'Nº de visitas', 'Última visita', 'Dias desde a última visita', 'Status'];
     const rows = sorted.map(c => {
       const s = visitStats(c);
       const cf = c.custom_fields || {};
-      const status = [cf.is_blacklist ? 'ブラックリスト' : '', s.dormant ? '休眠' : '', s.count === 0 ? '未来店' : ''].filter(Boolean).join('・');
+      const status = [cf.is_blacklist ? 'Lista negra' : '', s.dormant ? 'Inativo' : '', s.count === 0 ? 'Sem visitas' : ''].filter(Boolean).join(', ');
       return [c.name || '', c.phone || '', c.address || '',
         ...(isCar ? [c.car_model || '', c.car_number || '', c.inspection_date || ''] : extraFields.map((f: any) => cf[f.key] || '')),
         c.created_at ? new Date(c.created_at).toLocaleDateString('sv-SE') : '',
@@ -345,7 +345,7 @@ function CustomersPage()  {
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `顧客台帳_${new Date().toLocaleDateString('sv-SE')}.csv`;
+    a.href = url; a.download = `clientes_${new Date().toLocaleDateString('sv-SE')}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   };
@@ -391,8 +391,8 @@ function CustomersPage()  {
   }, [savedCategories]);
 
   const addWorkHistory = async () => {
-    if (!newWork.workType) { alert('作業項目を選択してください'); return; }
-    if (!newWork.workDate) { alert('日付を選択してください'); return; }
+    if (!newWork.workType) { alert('Escolha o serviço'); return; }
+    if (!newWork.workDate) { alert('Escolha a data'); return; }
     if (!currentUserId || !addWorkModal) return;
     setSavingWork(true);
     const { data, error } = await supabase.from('customer_work_history').insert({
@@ -402,7 +402,7 @@ function CustomersPage()  {
       work_date: newWork.workDate,
       custom_details: newWork.details,
     }).select().single();
-    if (error) { alert('保存に失敗しました: ' + error.message); setSavingWork(false); return; }
+    if (error) { alert('Falha ao salvar: ' + error.message); setSavingWork(false); return; }
     if (data) {
       setHistories(prev => ({ ...prev, [addWorkModal.id]: [data, ...(prev[addWorkModal.id] || [])] }));
       setAllHistory(prev => [data, ...prev]);
@@ -413,7 +413,7 @@ function CustomersPage()  {
   };
 
   const deleteWorkHistory = async (historyId: string, customerId: string) => {
-    if (!window.confirm('この作業履歴を削除しますか？')) return;
+    if (!window.confirm('Excluir este registro de serviço?')) return;
     await supabase.from('customer_work_history').delete().eq('id', historyId);
     setHistories(prev => {
       const n = { ...prev };
@@ -427,17 +427,17 @@ function CustomersPage()  {
     if (dateMode === 'registered') {
       if (!customer.created_at) return { main: '—', sub: '' };
       const d = new Date(customer.created_at);
-      return { main: d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }), sub: d.getFullYear().toString() };
+      return { main: d.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }), sub: d.getFullYear().toString() };
     } else {
       const h = histories[customer.id];
       const last = h?.[0]?.work_date;
       if (!last) return { main: '—', sub: '' };
       const d = new Date(last);
-      return { main: d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }), sub: d.getFullYear().toString() };
+      return { main: d.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }), sub: d.getFullYear().toString() };
     }
   };
 
-  // 来店状況バッジ
+  // Visitas状況バッジ
   const renderVisitBadges = (customer: any) => {
     const s = visitStats(customer);
     const badge = (text: string, color: string, bg: string) => (
@@ -445,9 +445,9 @@ function CustomersPage()  {
     );
     return (
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {s.count === 0 ? badge('未来店', '#6b7280', '#f3f4f6') : badge(`来店 ${s.count}回`, '#4f46e5', '#eef2ff')}
-        {s.days !== null && badge(s.days === 0 ? '本日来店' : `最終来店 ${s.days}日前`, s.dormant ? '#b45309' : '#047857', s.dormant ? '#fef3c7' : '#ecfdf5')}
-        {s.dormant && badge('😴 休眠', '#dc2626', '#fee2e2')}
+        {s.count === 0 ? badge('Sem visitas', '#6b7280', '#f3f4f6') : badge(`${s.count} visita(s)`, '#4f46e5', '#eef2ff')}
+        {s.days !== null && badge(s.days === 0 ? 'Visitou hoje' : `última visita há ${s.days} dias`, s.dormant ? '#b45309' : '#047857', s.dormant ? '#fef3c7' : '#ecfdf5')}
+        {s.dormant && badge('😴 Inativo', '#dc2626', '#fee2e2')}
       </div>
     );
   };
@@ -463,7 +463,7 @@ function CustomersPage()  {
     const isBlack = cf.is_blacklist === true;
     const groupedHistory: { [catName: string]: any[] } = {};
     history.forEach((h: any) => {
-      const catName = savedCategories.length > 0 ? (categoryMap[h.work_type] || 'その他') : (h.work_type || 'その他');
+      const catName = savedCategories.length > 0 ? (categoryMap[h.work_type] || 'Outros') : (h.work_type || 'Outros');
       if (!groupedHistory[catName]) groupedHistory[catName] = [];
       groupedHistory[catName].push(h);
     });
@@ -514,7 +514,7 @@ function CustomersPage()  {
               );
             })()}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              <button onClick={(e) => { e.stopPropagation(); router.push(`/customer-register?edit=${customer.id}`); }} style={{ padding: '5px 12px', borderRadius: '8px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}> 編集</button>
+              <button onClick={(e) => { e.stopPropagation(); router.push(`/customer-register?edit=${customer.id}`); }} style={{ padding: '5px 12px', borderRadius: '8px', border: '2px solid #6366f1', background: 'white', color: '#6366f1', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}> Editar</button>
               <span style={{ fontSize: '14px', color: '#c0c4d0', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </div>
           </div>
@@ -524,7 +524,7 @@ function CustomersPage()  {
               {customer.address && <span style={{ fontSize: '13px', color: '#6b7280' }}>{customer.address}</span>}
             </div>
             {isCar && inspStatus && (
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: inspStatus.color, background: inspStatus.bg, padding: '3px 10px', borderRadius: '8px', border: `1px solid ${inspStatus.color}30`, flexShrink: 0 }}>車検 {inspStatus.label}</span>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: inspStatus.color, background: inspStatus.bg, padding: '3px 10px', borderRadius: '8px', border: `1px solid ${inspStatus.color}30`, flexShrink: 0 }}>Licenciamento: {inspStatus.label}</span>
             )}
           </div>
         </div>
@@ -536,22 +536,22 @@ function CustomersPage()  {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {isCar ? null : (
                   bt.fields.filter(f => f.type !== 'textarea').map(f => (
-                    <div key={f.key} style={{ background: '#f8f9fa', borderRadius: '10px', padding: '12px 14px' }}><div style={{ fontSize: '11px', color: '#8b90a0', marginBottom: '4px' }}>{f.label}</div><div style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>{cf[f.key] || '未登録'}</div></div>
+                    <div key={f.key} style={{ background: '#f8f9fa', borderRadius: '10px', padding: '12px 14px' }}><div style={{ fontSize: '11px', color: '#8b90a0', marginBottom: '4px' }}>{f.label}</div><div style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>{cf[f.key] || 'Não informado'}</div></div>
                   ))
                 )}
                 {isCar && customer.inspection_date && (
-                  <div style={{ background: inspStatus?.bg || '#f8f9fa', borderRadius: '10px', padding: '12px 14px', border: `1px solid ${inspStatus?.color || '#e5e7eb'}30`, minWidth: '160px' }}><div style={{ fontSize: '11px', color: '#8b90a0', marginBottom: '4px' }}>車検満了日</div><div style={{ fontSize: '16px', fontWeight: 'bold', color: inspStatus?.color || '#333', letterSpacing: '1px' }}>{customer.inspection_date}</div><div style={{ fontSize: '12px', color: inspStatus?.color || '#888', marginTop: '2px' }}>{inspStatus?.label}</div></div>
+                  <div style={{ background: inspStatus?.bg || '#f8f9fa', borderRadius: '10px', padding: '12px 14px', border: `1px solid ${inspStatus?.color || '#e5e7eb'}30`, minWidth: '160px' }}><div style={{ fontSize: '11px', color: '#8b90a0', marginBottom: '4px' }}>Vencimento do licenciamento</div><div style={{ fontSize: '16px', fontWeight: 'bold', color: inspStatus?.color || '#333', letterSpacing: '1px' }}>{customer.inspection_date}</div><div style={{ fontSize: '12px', color: inspStatus?.color || '#888', marginTop: '2px' }}>{inspStatus?.label}</div></div>
                 )}
               </div>
               )}
 
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>作業履歴</div>
-                  <button onClick={(e) => { e.stopPropagation(); setAddWorkModal(customer); setNewWork({ workType: '', workDate: new Date().toLocaleDateString('sv-SE'), details: {} }); }} style={{ padding: '6px 14px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>＋ 作業を追加</button>
+                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1a1a2e' }}>Histórico de serviços</div>
+                  <button onClick={(e) => { e.stopPropagation(); setAddWorkModal(customer); setNewWork({ workType: '', workDate: new Date().toLocaleDateString('sv-SE'), details: {} }); }} style={{ padding: '6px 14px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>＋ Adicionar serviço</button>
                 </div>
                 {history.length === 0 ? (
-                  <div style={{ color: '#999', fontSize: '13px', textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '10px' }}>作業履歴がありません</div>
+                  <div style={{ color: '#999', fontSize: '13px', textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '10px' }}>Nenhum serviço registrado</div>
                 ) : (
                   Object.entries(groupedHistory).map(([catName, items]) => {
                     const catInfo = dynamicCategories.find(c => c.key === catName);
@@ -561,7 +561,7 @@ function CustomersPage()  {
                     return (
                       <div key={catName} style={{ marginBottom: '8px' }}>
                         <div onClick={(e) => { e.stopPropagation(); setExpandedHistCat(prev => ({ ...prev, [histKey]: !prev[histKey] })); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: catColor, padding: '10px 14px', background: `${catColor}12`, borderRadius: '10px', cursor: 'pointer' }}>
-                          <span>{catName}（{items.length}件）</span>
+                          <span>{catName} ({items.length})</span>
                           <span style={{ fontSize: '11px', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                         </div>
                         {isOpen && (
@@ -590,11 +590,11 @@ function CustomersPage()  {
                     <span style={{ fontSize: '20px' }}>🔔</span>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#92400e' }}>{action.action_type}</div>
-                      <div style={{ fontSize: '12px', color: '#b45309' }}>{action.scheduled_date || '期日未定'}{action.notes && ` ・${action.notes}`}</div>
+                      <div style={{ fontSize: '12px', color: '#b45309' }}>{action.scheduled_date || 'Sem data'}{action.notes && ` · ${action.notes}`}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                    <button onClick={(e) => { e.stopPropagation(); setResponseModal({ action, customer }); setResponseType(''); setResponseNotes(''); }} style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>対応</button>
+                    <button onClick={(e) => { e.stopPropagation(); setResponseModal({ action, customer }); setResponseType(''); setResponseNotes(''); }} style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Registrar</button>
                     <button onClick={(e) => handleCancelAction(customer.id, action.id, e)} style={{ padding: '6px 10px', borderRadius: '8px', border: '2px solid #d97706', background: 'white', color: '#d97706', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>×</button>
                   </div>
                 </div>
@@ -604,9 +604,9 @@ function CustomersPage()  {
                       <div key={log.id} style={{ display: 'flex', gap: '8px', fontSize: '12px', marginBottom: '4px', alignItems: 'flex-start' }}>
                         <span style={{ color: '#d97706', flexShrink: 0 }}>•</span>
                         <div style={{ flex: 1 }}>
-                          <span style={{ fontWeight: 'bold', color: log.log_type === '対応済み' ? '#16a34a' : log.log_type === '電話に出なかった' ? '#dc2626' : '#92400e' }}>{log.log_type}</span>
-                          {log.notes && <span style={{ color: '#92400e' }}> ・{log.notes}</span>}
-                          <span style={{ color: '#d97706', marginLeft: '8px' }}>{new Date(log.created_at).toLocaleDateString('ja-JP')}</span>
+                          <span style={{ fontWeight: 'bold', color: log.log_type === 'Resolvido' ? '#16a34a' : log.log_type === 'Não atendeu' ? '#dc2626' : '#92400e' }}>{log.log_type}</span>
+                          {log.notes && <span style={{ color: '#92400e' }}> · {log.notes}</span>}
+                          <span style={{ color: '#d97706', marginLeft: '8px' }}>{new Date(log.created_at).toLocaleDateString('pt-BR')}</span>
                         </div>
                       </div>
                     ))}
@@ -618,12 +618,12 @@ function CustomersPage()  {
             {customerPastLogs[customer.id]?.length > 0 && (() => {
               const totalLogs = customerPastLogs[customer.id].reduce((sum: number, p: any) => sum + p.logs.length, 0);
               const open = showPastLogs[customer.id];
-              const typeColor = (t: string) => t === '対応済み' ? '#16a34a' : t === '電話に出なかった' ? '#dc2626' : t === 'キャンセル' ? '#9ca3af' : '#6366f1';
-              const typeBg = (t: string) => t === '対応済み' ? '#dcfce7' : t === '電話に出なかった' ? '#fee2e2' : t === 'キャンセル' ? '#f3f4f6' : '#eef2ff';
+              const typeColor = (t: string) => t === 'Resolvido' ? '#16a34a' : t === 'Não atendeu' ? '#dc2626' : t === 'Cancelado' ? '#9ca3af' : '#6366f1';
+              const typeBg = (t: string) => t === 'Resolvido' ? '#dcfce7' : t === 'Não atendeu' ? '#fee2e2' : t === 'Cancelado' ? '#f3f4f6' : '#eef2ff';
               return (
               <div style={{ background: '#f8f9fa', borderRadius: '12px', padding: '14px 16px', marginBottom: '12px' }}>
                 <div onClick={(e) => { e.stopPropagation(); setShowPastLogs(prev => ({ ...prev, [customer.id]: !prev[customer.id] })); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#555' }}>過去の対応履歴 <span style={{ color: '#9ca3af', fontWeight: 'normal' }}>（{totalLogs}件）</span></div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#555' }}>Histórico de contatos <span style={{ color: '#9ca3af', fontWeight: 'normal' }}> ({totalLogs})</span></div>
                   <span style={{ fontSize: '11px', color: '#9ca3af', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </div>
                 {open && (
@@ -637,7 +637,7 @@ function CustomersPage()  {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', paddingLeft: '4px' }}>
                           {past.logs.map((log: any) => (
                             <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', background: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #eef0f5' }}>
-                              <span style={{ fontSize: '11px', color: '#9ca3af', flexShrink: 0, width: '62px' }}>{new Date(log.created_at).toLocaleDateString('ja-JP')}</span>
+                              <span style={{ fontSize: '11px', color: '#9ca3af', flexShrink: 0, width: '62px' }}>{new Date(log.created_at).toLocaleDateString('pt-BR')}</span>
                               <span style={{ fontWeight: 'bold', color: typeColor(log.log_type), background: typeBg(log.log_type), padding: '3px 10px', borderRadius: '6px', fontSize: '12px', flexShrink: 0 }}>{log.log_type}</span>
                               {log.notes && <span style={{ color: '#555', fontSize: '13px' }}>{log.notes}</span>}
                             </div>
@@ -652,8 +652,8 @@ function CustomersPage()  {
             })()}
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={(e) => { e.stopPropagation(); setActionModal(customer); setSelectedActionCat(''); setActionForm(action ? { type: action.action_type, dueDate: action.scheduled_date || '', notes: action.notes || '' } : { type: '', dueDate: '', notes: '' }); }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: action ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #1a1a2e, #0f3460)', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>{action ? 'アクション変更' : '次回アクション'}</button>
-              <button onClick={async () => { if (!window.confirm(`${customer.name}さんを削除しますか？`)) return; await supabase.from('customers').delete().eq('id', customer.id); setCustomers(prev => prev.filter(c => c.id !== customer.id)); }} style={{ padding: '12px 20px', borderRadius: '10px', border: '2px solid #ff5252', background: 'white', color: '#ff5252', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>削除</button>
+              <button onClick={(e) => { e.stopPropagation(); setActionModal(customer); setSelectedActionCat(''); setActionForm(action ? { type: action.action_type, dueDate: action.scheduled_date || '', notes: action.notes || '' } : { type: '', dueDate: '', notes: '' }); }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: action ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #1a1a2e, #0f3460)', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>{action ? 'Alterar ação' : 'Próxima ação'}</button>
+              <button onClick={async () => { if (!window.confirm(`Excluir o cliente ${customer.name}?`)) return; await supabase.from('customers').delete().eq('id', customer.id); setCustomers(prev => prev.filter(c => c.id !== customer.id)); }} style={{ padding: '12px 20px', borderRadius: '10px', border: '2px solid #ff5252', background: 'white', color: '#ff5252', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>Excluir</button>
             </div>
           </div>
         )}
@@ -671,7 +671,7 @@ function CustomersPage()  {
         <div style={{ position: 'absolute', width: '140px', height: '140px', borderRadius: '50%', border: '3px solid transparent', borderBottomColor: '#ff1493', borderLeftColor: '#ff69b4', animation: 'spin 1.8s linear infinite reverse' }} />
         <img src="/awwork.png" alt="Loading" style={{ width: '90px', height: '90px', objectFit: 'contain', animation: 'pulse 2s ease-in-out infinite' }} />
       </div>
-      <div style={{ marginTop: '30px', color: '#ff1493', fontSize: '14px', fontWeight: 'bold', letterSpacing: '3px', animation: 'pulse 2s ease-in-out infinite' }}>お待ちください...</div>
+      <div style={{ marginTop: '30px', color: '#ff1493', fontSize: '14px', fontWeight: 'bold', letterSpacing: '3px', animation: 'pulse 2s ease-in-out infinite' }}>Aguarde...</div>
     </div>
   );
 
@@ -686,15 +686,15 @@ function CustomersPage()  {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15,20,40,0.55)', backdropFilter: 'blur(2px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setAddWorkModal(null)}>
           <div style={{ width: '480px', background: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 25px 60px rgba(0,0,0,0.35)', maxHeight: '88vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>＋ 作業履歴を追加</span>
+              <span>＋ Registrar serviço</span>
               <span onClick={() => setAddWorkModal(null)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span>
             </div>
-            <div style={{ fontSize: '13px', color: '#8b90a0', marginBottom: '20px' }}>{addWorkModal.name}さんの来店・作業を記録します</div>
+            <div style={{ fontSize: '13px', color: '#8b90a0', marginBottom: '20px' }}>Registrar visita / serviço de {addWorkModal.name}</div>
 
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>作業項目</div>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Serviço</div>
               {savedCategories.length === 0 ? (
-                <div style={{ fontSize: '12px', color: '#bbb', padding: '12px', background: '#f8f9fa', borderRadius: '10px' }}>作業項目がありません。ダッシュボードの「項目追加」から登録してください。</div>
+                <div style={{ fontSize: '12px', color: '#bbb', padding: '12px', background: '#f8f9fa', borderRadius: '10px' }}>Nenhum serviço. Cadastre em "Serviços" no painel.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {savedCategories.map(cat => {
@@ -721,30 +721,30 @@ function CustomersPage()  {
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>作業日</div>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Data do serviço</div>
               <input type="date" value={newWork.workDate} onChange={e => setNewWork({ ...newWork, workDate: e.target.value })} style={{ width: '100%', padding: '11px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} />
             </div>
 
             {newWork.workType && selectedFields.length > 0 && (
               <div style={{ marginBottom: '16px', background: 'linear-gradient(135deg, #f8f9ff, #f1f3fb)', borderRadius: '12px', padding: '16px' }}>
-                <div style={{ fontSize: '12px', color: '#6366f1', marginBottom: '12px', fontWeight: 'bold' }}>📝 {newWork.workType} の記録</div>
+                <div style={{ fontSize: '12px', color: '#6366f1', marginBottom: '12px', fontWeight: 'bold' }}>📝 Registro: {newWork.workType}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {selectedFields.map((f, idx) => (
                     <div key={idx}>
                       <div style={{ fontSize: '12px', color: '#8b90a0', marginBottom: '5px', fontWeight: 'bold' }}>{f.label}</div>
-                      <input value={newWork.details[f.label] || ''} onChange={e => setNewWork({ ...newWork, details: { ...newWork.details, [f.label]: e.target.value } })} placeholder={`${f.label}を入力`} style={{ width: '100%', padding: '10px 12px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none', background: 'white' }} />
+                      <input value={newWork.details[f.label] || ''} onChange={e => setNewWork({ ...newWork, details: { ...newWork.details, [f.label]: e.target.value } })} placeholder={`${f.label}`} style={{ width: '100%', padding: '10px 12px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none', background: 'white' }} />
                     </div>
                   ))}
                 </div>
               </div>
             )}
             {newWork.workType && selectedFields.length === 0 && (
-              <div style={{ marginBottom: '16px', fontSize: '12px', color: '#8b90a0', background: '#f8f9fa', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>この項目には記録欄が未設定です（予約管理の⚙️設定で作成できます）</div>
+              <div style={{ marginBottom: '16px', fontSize: '12px', color: '#8b90a0', background: '#f8f9fa', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>Este serviço não tem campos (crie em ⚙️ Configurações)</div>
             )}
 
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setAddWorkModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontWeight: 'bold' }}>キャンセル</button>
-              <button onClick={addWorkHistory} disabled={savingWork} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: savingWork ? '#ccc' : 'linear-gradient(135deg, #10b981, #059669)', color: 'white', cursor: savingWork ? 'default' : 'pointer', fontWeight: 'bold' }}>{savingWork ? '保存中...' : '💾 記録する'}</button>
+              <button onClick={() => setAddWorkModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
+              <button onClick={addWorkHistory} disabled={savingWork} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: savingWork ? '#ccc' : 'linear-gradient(135deg, #10b981, #059669)', color: 'white', cursor: savingWork ? 'default' : 'pointer', fontWeight: 'bold' }}>{savingWork ? 'Salvando...' : '💾 Registrar'}</button>
             </div>
           </div>
         </div>
@@ -757,21 +757,21 @@ function CustomersPage()  {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15,20,40,0.55)', backdropFilter: 'blur(2px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setHistoryModal(null)}>
           <div style={{ width: '460px', background: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 25px 60px rgba(0,0,0,0.35)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>📋 作業内容の詳細</span>
+              <span>📋 Detalhes do serviço</span>
               <span onClick={() => setHistoryModal(null)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
               <div style={{ width: '5px', height: '44px', borderRadius: '3px', background: historyModal.catColor || '#6366f1', flexShrink: 0 }} />
               <div>
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a1a2e' }}>{historyModal.work_type}</div>
-                <div style={{ fontSize: '13px', color: '#8b90a0', marginTop: '2px' }}>📅 {historyModal.work_date || '日付未登録'}</div>
+                <div style={{ fontSize: '13px', color: '#8b90a0', marginTop: '2px' }}>📅 {historyModal.work_date || 'Sem data'}</div>
               </div>
             </div>
 
             {fields.length === 0 ? (
               <div style={{ background: 'linear-gradient(135deg, #f8f9ff, #f1f3fb)', borderRadius: '12px', padding: '20px', textAlign: 'center' }}>
-                <div style={{ fontSize: '13px', color: '#8b90a0', marginBottom: '8px' }}>この項目には記録欄がまだ設定されていません</div>
-                <div style={{ fontSize: '12px', color: '#6366f1', fontWeight: 'bold' }}>予約管理の「⚙️ 設定」から記録欄を作成できます</div>
+                <div style={{ fontSize: '13px', color: '#8b90a0', marginBottom: '8px' }}>Este serviço ainda não tem campos</div>
+                <div style={{ fontSize: '12px', color: '#6366f1', fontWeight: 'bold' }}>Crie campos em "⚙️ Configurações"</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -779,7 +779,7 @@ function CustomersPage()  {
                   <div key={idx}>
                     <div style={{ fontSize: '12px', color: '#8b90a0', marginBottom: '6px', fontWeight: 'bold' }}>{f.label}</div>
                     {isPremium ? (
-                      <input value={detailValues[f.label] || ''} onChange={e => setDetailValues({ ...detailValues, [f.label]: e.target.value })} placeholder={`${f.label}を入力`} style={{ width: '100%', padding: '11px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} />
+                      <input value={detailValues[f.label] || ''} onChange={e => setDetailValues({ ...detailValues, [f.label]: e.target.value })} placeholder={`${f.label}`} style={{ width: '100%', padding: '11px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }} />
                     ) : (
                       <div style={{ padding: '11px 14px', background: '#f8f9fa', borderRadius: '10px', fontSize: '14px', color: '#333', minHeight: '20px' }}>{detailValues[f.label] || '—'}</div>
                     )}
@@ -789,13 +789,13 @@ function CustomersPage()  {
             )}
 
             {!isPremium && fields.length > 0 && (
-              <div style={{ marginTop: '14px', fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', textAlign: 'center' }}>🔒 編集は有料プランのみ</div>
+              <div style={{ marginTop: '14px', fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', textAlign: 'center' }}>🔒 Edição só no Premium</div>
             )}
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-              <button onClick={() => setHistoryModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontWeight: 'bold' }}>閉じる</button>
+              <button onClick={() => setHistoryModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontWeight: 'bold' }}>Fechar</button>
               {isPremium && fields.length > 0 && (
-                <button onClick={saveHistoryDetail} disabled={savingDetail} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: savingDetail ? '#ccc' : 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: savingDetail ? 'default' : 'pointer', fontWeight: 'bold' }}>{savingDetail ? '保存中...' : '💾 保存'}</button>
+                <button onClick={saveHistoryDetail} disabled={savingDetail} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: savingDetail ? '#ccc' : 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: savingDetail ? 'default' : 'pointer', fontWeight: 'bold' }}>{savingDetail ? 'Salvando...' : '💾 Salvar'}</button>
               )}
             </div>
           </div>
@@ -806,35 +806,35 @@ function CustomersPage()  {
       {responseModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15,20,40,0.55)', backdropFilter: 'blur(2px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setResponseModal(null)}>
           <div style={{ width: '440px', background: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 25px 60px rgba(0,0,0,0.35)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}><span>📝 対応記録</span><span onClick={() => setResponseModal(null)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span></div>
-            <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>{responseModal.customer.name}さん ・ {responseModal.action.action_type}</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}><span>📝 Registrar contato</span><span onClick={() => setResponseModal(null)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span></div>
+            <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>{responseModal.customer.name} · {responseModal.action.action_type}</div>
             <div style={{ marginBottom: '15px' }}>
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>対応内容</div>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Resultado</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {['予約済み', '電話に出なかった', '再度連絡予定', '見積もり送付済み', 'キャンセル', '対応済み'].map(type => (
-                  <div key={type} onClick={() => setResponseType(type)} style={{ padding: '10px', borderRadius: '10px', border: `2px solid ${responseType === type ? (type === '対応済み' ? '#16a34a' : type === '電話に出なかった' ? '#dc2626' : '#6366f1') : '#e5e7eb'}`, background: responseType === type ? (type === '対応済み' ? '#f0fdf4' : type === '電話に出なかった' ? '#fef2f2' : '#f0f0ff') : 'white', cursor: 'pointer', fontSize: '13px', fontWeight: responseType === type ? 'bold' : 'normal', textAlign: 'center', color: responseType === type ? (type === '対応済み' ? '#16a34a' : type === '電話に出なかった' ? '#dc2626' : '#6366f1') : '#555' }}>{type}</div>
+                {['Agendado', 'Não atendeu', 'Ligar de novo', 'Orçamento enviado', 'Cancelado', 'Resolvido'].map(type => (
+                  <div key={type} onClick={() => setResponseType(type)} style={{ padding: '10px', borderRadius: '10px', border: `2px solid ${responseType === type ? (type === 'Resolvido' ? '#16a34a' : type === 'Não atendeu' ? '#dc2626' : '#6366f1') : '#e5e7eb'}`, background: responseType === type ? (type === 'Resolvido' ? '#f0fdf4' : type === 'Não atendeu' ? '#fef2f2' : '#f0f0ff') : 'white', cursor: 'pointer', fontSize: '13px', fontWeight: responseType === type ? 'bold' : 'normal', textAlign: 'center', color: responseType === type ? (type === 'Resolvido' ? '#16a34a' : type === 'Não atendeu' ? '#dc2626' : '#6366f1') : '#555' }}>{type}</div>
                 ))}
               </div>
             </div>
             <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>メモ</div>
-              <textarea value={responseNotes} onChange={e => setResponseNotes(e.target.value)} placeholder="対応内容の詳細など" style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '13px', boxSizing: 'border-box', minHeight: '80px', fontFamily: 'inherit' }} />
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Notas</div>
+              <textarea value={responseNotes} onChange={e => setResponseNotes(e.target.value)} placeholder="Detalhes do contato" style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '13px', boxSizing: 'border-box', minHeight: '80px', fontFamily: 'inherit' }} />
             </div>
             {actionLogs[responseModal.action.id]?.length > 0 && (
               <div style={{ marginBottom: '20px', background: '#f8f9fa', borderRadius: '10px', padding: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📋 対応履歴</div>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', marginBottom: '8px' }}>📋 Histórico de contatos</div>
                 {actionLogs[responseModal.action.id].map((log: any) => (
                   <div key={log.id} style={{ fontSize: '12px', marginBottom: '6px', display: 'flex', gap: '6px' }}>
-                    <span style={{ color: '#999', flexShrink: 0 }}>{new Date(log.created_at).toLocaleDateString('ja-JP')}</span>
-                    <span style={{ fontWeight: 'bold', color: log.log_type === '対応済み' ? '#16a34a' : log.log_type === '電話に出なかった' ? '#dc2626' : '#333' }}>{log.log_type}</span>
-                    {log.notes && <span style={{ color: '#666' }}>・{log.notes}</span>}
+                    <span style={{ color: '#999', flexShrink: 0 }}>{new Date(log.created_at).toLocaleDateString('pt-BR')}</span>
+                    <span style={{ fontWeight: 'bold', color: log.log_type === 'Resolvido' ? '#16a34a' : log.log_type === 'Não atendeu' ? '#dc2626' : '#333' }}>{log.log_type}</span>
+                    {log.notes && <span style={{ color: '#666' }}>· {log.notes}</span>}
                   </div>
                 ))}
               </div>
             )}
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setResponseModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer' }}>キャンセル</button>
-              <button onClick={handleResponse} disabled={!responseType} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: !responseType ? '#ccc' : 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', cursor: !responseType ? 'default' : 'pointer', fontWeight: 'bold' }}>記録する</button>
+              <button onClick={() => setResponseModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleResponse} disabled={!responseType} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: !responseType ? '#ccc' : 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', cursor: !responseType ? 'default' : 'pointer', fontWeight: 'bold' }}>Registrar</button>
             </div>
           </div>
         </div>
@@ -843,15 +843,15 @@ function CustomersPage()  {
       {actionModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15,20,40,0.55)', backdropFilter: 'blur(2px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setActionModal(null)}>
           <div style={{ width: '440px', background: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}><span>次回アクション設定</span><span onClick={() => setActionModal(null)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span></div>
-            <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>{actionModal.name}さんへのフォローアップ</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}><span>Definir próxima ação</span><span onClick={() => setActionModal(null)} style={{ cursor: 'pointer', color: '#ccc' }}>×</span></div>
+            <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>{actionModal.name} — acompanhamento</div>
             <div style={{ marginBottom: '15px' }}>
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>アクション内容</div>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Ação</div>
               {savedCategories.filter(cat => (cat.actionTypes || []).length > 0).length === 0 ? (
-                <div style={{ fontSize: '13px', color: '#bbb', textAlign: 'center', padding: '20px', background: '#f8f9fa', borderRadius: '10px' }}>アクションが未設定です。予約管理の「⚙️ 設定」で登録してください。</div>
+                <div style={{ fontSize: '13px', color: '#bbb', textAlign: 'center', padding: '20px', background: '#f8f9fa', borderRadius: '10px' }}>Nenhuma ação definida. Cadastre em "⚙️ Configurações".</div>
               ) : !selectedActionCat ? (
                 <div>
-                  <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>カテゴリーを選択</div>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>Escolha a categoria</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     {savedCategories.filter(cat => (cat.actionTypes || []).length > 0).map(cat => (
                       <div key={cat.category} onClick={() => setSelectedActionCat(cat.category)} style={{ padding: '14px', borderRadius: '10px', border: `2px solid ${cat.borderColor || '#6366f1'}`, background: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', color: '#1a1a2e', transition: 'all 0.15s' }} onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = `${cat.borderColor || '#6366f1'}15`} onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'white'}>{cat.category}</div>
@@ -861,7 +861,7 @@ function CustomersPage()  {
               ) : (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                    <button onClick={() => { setSelectedActionCat(''); setActionForm({ ...actionForm, type: '' }); }} style={{ padding: '5px 10px', borderRadius: '8px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: '12px', color: '#666' }}>← 戻る</button>
+                    <button onClick={() => { setSelectedActionCat(''); setActionForm({ ...actionForm, type: '' }); }} style={{ padding: '5px 10px', borderRadius: '8px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: '12px', color: '#666' }}>← Voltar</button>
                     <span style={{ fontSize: '13px', fontWeight: 'bold', color: savedCategories.find(c => c.category === selectedActionCat)?.borderColor || '#6366f1' }}>🔔 {selectedActionCat}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -871,19 +871,19 @@ function CustomersPage()  {
                   </div>
                 </div>
               )}
-              <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px', textAlign: 'right' }}>選択肢は予約管理の「⚙️ 設定」で編集できます</div>
+              <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px', textAlign: 'right' }}>Edite as opções em "⚙️ Configurações"</div>
             </div>
             <div style={{ marginBottom: '15px' }}>
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>期日</div>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Data</div>
               <input type="date" value={actionForm.dueDate} onChange={e => setActionForm({ ...actionForm, dueDate: e.target.value })} style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>メモ</div>
-              <textarea value={actionForm.notes} onChange={e => setActionForm({ ...actionForm, notes: e.target.value })} placeholder="連絡内容や補足など" style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '13px', boxSizing: 'border-box', minHeight: '80px', fontFamily: 'inherit' }} />
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Notas</div>
+              <textarea value={actionForm.notes} onChange={e => setActionForm({ ...actionForm, notes: e.target.value })} placeholder="Detalhes ou observações" style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '13px', boxSizing: 'border-box', minHeight: '80px', fontFamily: 'inherit' }} />
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setActionModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer' }}>キャンセル</button>
-              <button onClick={handleSaveAction} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}>保存</button>
+              <button onClick={() => setActionModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleSaveAction} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}>Salvar</button>
             </div>
           </div>
         </div>
@@ -902,7 +902,7 @@ function CustomersPage()  {
           if (!cat || !cat.items || cat.items.length === 0) return null;
           return (
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <button onClick={() => setActiveItem(null)} style={{ padding: '8px 14px', borderRadius: '10px', border: activeItem === null ? 'none' : '2px solid #e5e7eb', background: activeItem === null ? activeCatInfo.color : 'white', color: activeItem === null ? 'white' : '#555', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>すべての{activeCategory}</button>
+              <button onClick={() => setActiveItem(null)} style={{ padding: '8px 14px', borderRadius: '10px', border: activeItem === null ? 'none' : '2px solid #e5e7eb', background: activeItem === null ? activeCatInfo.color : 'white', color: activeItem === null ? 'white' : '#555', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Todos: {activeCategory}</button>
               {cat.items.map((item: any) => {
                 const itemCount = customers.filter(c => { const hist = histories[c.id] || []; return hist.some(h => h.work_type === item.title); }).length;
                 return (<button key={item.title} onClick={() => setActiveItem(activeItem === item.title ? null : item.title)} style={{ padding: '8px 14px', borderRadius: '10px', border: activeItem === item.title ? 'none' : '2px solid #e5e7eb', background: activeItem === item.title ? (item.borderColor || activeCatInfo.color) : 'white', color: activeItem === item.title ? 'white' : '#555', cursor: 'pointer', fontSize: '12px', fontWeight: activeItem === item.title ? 'bold' : 'normal' }}>{item.title}（{itemCount}）</button>);
@@ -917,7 +917,7 @@ function CustomersPage()  {
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
               <button onClick={() => setSelectedYear(y => y - 1)} style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: 'white', cursor: 'pointer', fontSize: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>◀</button>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', fontFamily: 'Georgia, serif', letterSpacing: '3px' }}>{selectedYear}年</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', fontFamily: 'Georgia, serif', letterSpacing: '3px' }}>{selectedYear}</div>
               <button onClick={() => setSelectedYear(y => y + 1)} style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: 'white', cursor: 'pointer', fontSize: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>▶</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
@@ -925,7 +925,7 @@ function CustomersPage()  {
                 <div key={idx} onClick={() => setSelectedMonth(idx)} style={{ background: 'white', borderRadius: '18px', padding: '20px', cursor: 'pointer', boxShadow: isCurrentMonth ? `0 8px 24px ${activeCatInfo.color}35` : '0 2px 10px rgba(0,0,0,0.05)', border: isCurrentMonth ? `3px solid ${activeCatInfo.color}` : '2px solid #eef0f5', transition: 'all 0.2s', position: 'relative', overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', borderRadius: '50%', background: count > 0 ? `${activeCatInfo.color}12` : 'transparent' }} />
                   <div style={{ fontSize: '22px', fontWeight: 'bold', color: isCurrentMonth ? activeCatInfo.color : '#1a1a2e', marginBottom: '8px', fontFamily: 'Georgia, serif' }}>{month}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><div style={{ fontSize: '28px', fontWeight: 'bold', color: count > 0 ? activeCatInfo.color : '#d0d0d0' }}>{count}</div><div style={{ fontSize: '11px', color: '#999' }}>件</div></div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><div style={{ fontSize: '28px', fontWeight: 'bold', color: count > 0 ? activeCatInfo.color : '#d0d0d0' }}>{count}</div><div style={{ fontSize: '11px', color: '#999' }}>serviços</div></div>
                   {count > 0 && <div style={{ marginTop: '8px', height: '4px', borderRadius: '2px', background: '#f0f0f0' }}><div style={{ height: '100%', borderRadius: '2px', background: activeCatInfo.gradient, width: `${Math.min(count * 10, 100)}%` }} /></div>}
                 </div>); })}
             </div>
@@ -935,12 +935,12 @@ function CustomersPage()  {
         {viewMode === 'monthly' && selectedMonth !== null && (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <button onClick={() => setSelectedMonth(null)} style={{ padding: '8px 16px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: '13px' }}>← 月一覧に戻る</button>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a1a2e', fontFamily: 'Georgia, serif' }}>{selectedYear}年 {MONTHS[selectedMonth]}</div>
-              <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', background: activeCatInfo.gradient, color: 'white' }}>{getMonthCustomers(selectedMonth).length}名</div>
+              <button onClick={() => setSelectedMonth(null)} style={{ padding: '8px 16px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: '13px' }}>← Voltar aos meses</button>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a1a2e', fontFamily: 'Georgia, serif' }}>{MONTHS[selectedMonth]} {selectedYear}</div>
+              <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', background: activeCatInfo.gradient, color: 'white' }}>{getMonthCustomers(selectedMonth).length} clientes</div>
             </div>
             {getMonthCustomers(selectedMonth).length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '18px' }}><div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div><div style={{ color: '#999', fontSize: '14px' }}>この月の作業履歴はありません</div></div>
+              <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '18px' }}><div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div><div style={{ color: '#999', fontSize: '14px' }}>Nenhum serviço neste mês</div></div>
             ) : (getMonthCustomers(selectedMonth).map(({ customer }) => renderCustomerCard(customer)))}
           </>
         )}
@@ -950,13 +950,13 @@ function CustomersPage()  {
             {/* サマリー */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
               {[
-                { label: '顧客総数', value: customers.length, color: '#374151', bg: 'white', onClick: () => setDormantOnly(false), active: false },
-                { label: '今月の新規', value: newThisMonth, color: '#6366f1', bg: '#eef2ff', onClick: () => setSortMode('registered'), active: false },
-                { label: `休眠（${DORMANT_DAYS}日以上来店なし）`, value: dormantCount, color: '#dc2626', bg: '#fee2e2', onClick: () => setDormantOnly(!dormantOnly), active: dormantOnly },
+                { label: 'Total de clientes', value: customers.length, color: '#374151', bg: 'white', onClick: () => setDormantOnly(false), active: false },
+                { label: 'Novos no mês', value: newThisMonth, color: '#6366f1', bg: '#eef2ff', onClick: () => setSortMode('registered'), active: false },
+                { label: `Inativos (sem visita há ${DORMANT_DAYS}+ dias)`, value: dormantCount, color: '#dc2626', bg: '#fee2e2', onClick: () => setDormantOnly(!dormantOnly), active: dormantOnly },
               ].map(s => (
                 <div key={s.label} onClick={s.onClick} style={{ padding: '10px 16px', borderRadius: '12px', background: s.bg, boxShadow: s.active ? `0 0 0 2px ${s.color}` : '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer', minWidth: '120px', transition: '0.15s' }}>
                   <div style={{ fontSize: '11px', color: '#888', fontWeight: 'bold' }}>{s.label}</div>
-                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: s.color }}>{s.value}<span style={{ fontSize: '11px', color: '#999', fontWeight: 'normal' }}>人</span></div>
+                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: s.color }}>{s.value}<span style={{ fontSize: '11px', color: '#999', fontWeight: 'normal' }}></span></div>
                 </div>
               ))}
             </div>
@@ -964,16 +964,16 @@ function CustomersPage()  {
             {/* ツールバー */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               <select value={sortMode} onChange={e => setSortMode(e.target.value as any)} style={{ padding: '8px 12px', borderRadius: '10px', border: '2px solid #e5e7eb', background: 'white', fontSize: '12px', fontWeight: 'bold', color: '#374151', cursor: 'pointer', outline: 'none' }}>
-                <option value="registered">📅 登録日が新しい順</option>
-                <option value="lastVisit">🔧 最終来店が新しい順</option>
-                <option value="visits">🔁 来店回数が多い順</option>
-                <option value="longAgo">⏳ 来店が遠い順</option>
-                <option value="name">🔤 名前順</option>
+                <option value="registered">📅 Cadastro mais recente</option>
+                <option value="lastVisit">🔧 Visita mais recente</option>
+                <option value="visits">🔁 Mais visitas</option>
+                <option value="longAgo">⏳ Há mais tempo sem visita</option>
+                <option value="name">🔤 Nome (A–Z)</option>
               </select>
-              <button onClick={() => setDormantOnly(!dormantOnly)} style={{ padding: '7px 14px', borderRadius: '10px', border: `2px solid ${dormantOnly ? '#dc2626' : '#e5e7eb'}`, background: dormantOnly ? '#fee2e2' : 'white', color: dormantOnly ? '#dc2626' : '#555', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>😴 休眠客のみ（{dormantCount}）</button>
+              <button onClick={() => setDormantOnly(!dormantOnly)} style={{ padding: '7px 14px', borderRadius: '10px', border: `2px solid ${dormantOnly ? '#dc2626' : '#e5e7eb'}`, background: dormantOnly ? '#fee2e2' : 'white', color: dormantOnly ? '#dc2626' : '#555', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>😴 Somente inativos ({dormantCount})</button>
               <div style={{ flex: 1 }} />
               <div style={{ display: 'flex', background: '#e9ebf3', borderRadius: '10px', padding: '3px' }}>
-                {([['card', '🗂 カード'], ['table', '📋 一覧表']] as const).map(([m, label]) => (
+                {([['card', '🗂 Cartões'], ['table', '📋 Tabela']] as const).map(([m, label]) => (
                   <div key={m} onClick={() => setDisplayMode(m)} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', background: displayMode === m ? 'white' : 'transparent', color: displayMode === m ? '#4f46e5' : '#888', boxShadow: displayMode === m ? '0 1px 4px rgba(0,0,0,0.1)' : 'none' }}>{label}</div>
                 ))}
               </div>
@@ -986,11 +986,11 @@ function CustomersPage()  {
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              placeholder={isCar ? "🔍 名前・電話番号・車種・ナンバーで検索..." : "🔍 名前・電話番号で検索..."}
+              placeholder={isCar ? "🔍 Buscar por nome, telefone, modelo ou placa..." : "🔍 Buscar por nome ou telefone..."}
               style={{ width: '100%', padding: '14px 18px', border: `2px solid ${searchFocused ? '#6366f1' : '#e5e7eb'}`, borderRadius: '14px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '20px', outline: 'none', boxShadow: searchFocused ? '0 0 0 4px rgba(99,102,241,0.12)' : 'none', transition: 'all 0.2s', background: 'white' }}
             />
             {sorted.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '18px' }}><div style={{ fontSize: '48px', marginBottom: '12px' }}>👤</div><div style={{ color: '#999', fontSize: '14px' }}>{searchQuery || dormantOnly ? '該当するお客様がいません' : '顧客が登録されていません'}</div></div>
+              <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '18px' }}><div style={{ fontSize: '48px', marginBottom: '12px' }}>👤</div><div style={{ color: '#999', fontSize: '14px' }}>{searchQuery || dormantOnly ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}</div></div>
             ) : displayMode === 'card' ? (
               sorted.map(customer => renderCustomerCard(customer))
             ) : (
@@ -998,7 +998,7 @@ function CustomersPage()  {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: '#1a1a2e', color: 'white' }}>
-                      {['名前', '電話番号', isCar ? '車種・ナンバー' : (bt.fields.find((f: any) => f.type === 'text')?.label || '情報'), '来店', '最終来店', '登録日', '状態'].map(h => (
+                      {['Nome', 'Telefone', isCar ? 'Modelo / placa' : (bt.fields.find((f: any) => f.type === 'text')?.label || 'Info'), 'Visitas', 'Última visita', 'Cadastro', 'Status'].map(h => (
                         <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -1015,15 +1015,15 @@ function CustomersPage()  {
                           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isBlack ? '#fef2f2' : i % 2 === 0 ? 'white' : '#fafbfc'}>
                           <td style={{ padding: '10px 12px', fontWeight: 'bold', color: isBlack ? '#dc2626' : '#1a1a2e', whiteSpace: 'nowrap' }}>{c.name}</td>
                           <td style={{ padding: '10px 12px', color: '#555', whiteSpace: 'nowrap' }}>{c.phone || '—'}</td>
-                          <td style={{ padding: '10px 12px', color: '#555', whiteSpace: 'nowrap' }}>{isCar ? `${c.car_model || '—'}${c.car_number ? `・${c.car_number}` : ''}` : (getCustomerSubInfo(c) || '—')}</td>
-                          <td style={{ padding: '10px 12px', fontWeight: 'bold', color: s.count ? '#4f46e5' : '#bbb', whiteSpace: 'nowrap' }}>{s.count}回</td>
-                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: s.dormant ? '#b45309' : '#555' }}>{s.last ? <>{s.last}<span style={{ fontSize: '11px', color: '#999' }}>（{s.days}日前）</span></> : '—'}</td>
+                          <td style={{ padding: '10px 12px', color: '#555', whiteSpace: 'nowrap' }}>{isCar ? `${c.car_model || '—'}${c.car_number ? ` · ${c.car_number}` : ''}` : (getCustomerSubInfo(c) || '—')}</td>
+                          <td style={{ padding: '10px 12px', fontWeight: 'bold', color: s.count ? '#4f46e5' : '#bbb', whiteSpace: 'nowrap' }}>{s.count}x</td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: s.dormant ? '#b45309' : '#555' }}>{s.last ? <>{s.last}<span style={{ fontSize: '11px', color: '#999' }}> (há {s.days} dias)</span></> : '—'}</td>
                           <td style={{ padding: '10px 12px', color: '#888', whiteSpace: 'nowrap' }}>{c.created_at ? new Date(c.created_at).toLocaleDateString('sv-SE') : '—'}</td>
                           <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', gap: '4px' }}>
                               {isBlack && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#ef4444', color: 'white', padding: '2px 8px', borderRadius: '6px' }}>BL</span>}
-                              {s.dormant && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '6px' }}>休眠</span>}
-                              {s.count === 0 && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#f3f4f6', color: '#6b7280', padding: '2px 8px', borderRadius: '6px' }}>未来店</span>}
+                              {s.dormant && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '6px' }}>Inativo</span>}
+                              {s.count === 0 && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#f3f4f6', color: '#6b7280', padding: '2px 8px', borderRadius: '6px' }}>Sem visitas</span>}
                               {action && <span style={{ fontSize: '10px', fontWeight: 'bold', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '6px' }}>🔔</span>}
                             </div>
                           </td>
